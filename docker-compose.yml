@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:14-alpine
+    container_name: invoice-db
+    environment:
+      POSTGRES_DB: invoice_db
+      POSTGRES_USER: invoice_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-dev_password_change_in_prod}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U invoice_user -d invoice_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: invoice-backend
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: postgresql://invoice_user:${DB_PASSWORD:-dev_password_change_in_prod}@postgres:5432/invoice_db
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_COGNITO_USER_POOL_ID: ${AWS_COGNITO_USER_POOL_ID}
+      AWS_COGNITO_CLIENT_ID: ${AWS_COGNITO_CLIENT_ID}
+      AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME}
+      CORS_ORIGIN: http://localhost:5173
+      RATE_LIMIT_MAX: 100
+      RATE_LIMIT_WINDOW_MS: 60000
+      LOG_LEVEL: info
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./migrations:/app/migrations
+      - ./.migrate.json:/app/.migrate.json
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health')"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  # Frontend (development mode)
+  frontend:
+    build:
+      context: ./invoice-frontend
+      dockerfile: Dockerfile
+    container_name: invoice-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health.html"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  postgres_data:
+    driver: local
+
