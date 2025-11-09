@@ -14,9 +14,6 @@ import { validateEnv } from './config/env';
 // These will be imported after validateEnv() runs to avoid circular dependency issues
 let getSwaggerSpec: any;
 let authRouter: any;
-let customerRouter: any;
-let invoiceRouter: any;
-let paymentRouter: any;
 let getLimiter: any;
 let pool: any;
 let configureDependencies: any;
@@ -59,9 +56,6 @@ const { config } = require('./config/env');
 console.log('📦 Loading application modules...');
 getSwaggerSpec = require('./config/swagger').getSwaggerSpec;
 authRouter = require('./features/auth/authRouter').default;
-customerRouter = require('./features/customers/customerRouter').default;
-invoiceRouter = require('./features/invoices/invoiceRouter').default;
-paymentRouter = require('./features/payments/paymentRouter').default;
 getLimiter = require('./shared/middleware/rateLimiter').getLimiter;
 pool = require('./infrastructure/database').pool;
 const diModule = require('./infrastructure/configuration/DependencyContainer');
@@ -87,7 +81,6 @@ try {
 
 const app: Application = express();
 const PORT = config.PORT;
-const USE_NEW_ARCHITECTURE = process.env.USE_NEW_ARCHITECTURE === 'true';
 
 // Security middleware
 app.use(helmet({
@@ -140,22 +133,13 @@ try {
 }
 
 // API Routes
+console.log('🚀 Registering CQRS architecture routes...');
 app.use('/api/v1/auth', authRouter);
-
-// Feature flag: Use new CQRS architecture or old implementation
-if (USE_NEW_ARCHITECTURE) {
-  console.log('🚀 Using new CQRS architecture');
-  app.use('/api/v1/customers', authMiddleware, createCustomerRoutes(container));
-  app.use('/api/v1/invoices', authMiddleware, createInvoiceRoutes(container));
-  app.use('/api/v1/payments', authMiddleware, createPaymentRoutes(container));
-  app.use('/api/v1/dashboard', authMiddleware, createDashboardRoutes(container));
-} else {
-  console.log('⚙️  Using legacy architecture');
-  app.use('/api/v1/customers', customerRouter);
-  app.use('/api/v1/invoices', invoiceRouter);
-  app.use('/api/v1', paymentRouter);
-  app.use('/api/v1/dashboard', authMiddleware, createDashboardRoutes(container));
-}
+app.use('/api/v1/customers', authMiddleware, createCustomerRoutes(container));
+app.use('/api/v1/invoices', authMiddleware, createInvoiceRoutes(container));
+app.use('/api/v1/payments', authMiddleware, createPaymentRoutes(container));
+app.use('/api/v1/dashboard', authMiddleware, createDashboardRoutes(container));
+console.log('✅ Routes registered successfully');
 
 // Error handler middleware (MUST BE LAST)
 app.use(errorHandler);
