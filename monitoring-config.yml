@@ -1,0 +1,399 @@
+# Monitoring & Alerting Configuration
+# This file documents the monitoring setup for production
+
+monitoring:
+  provider: "CloudWatch" # or "Datadog", "New Relic", etc.
+  
+  dashboards:
+    - name: "Application Metrics"
+      widgets:
+        - type: "line-chart"
+          title: "Request Rate (req/min)"
+          metrics:
+            - namespace: "InvoiceApp"
+              metric: "RequestCount"
+              stat: "Sum"
+              period: 60
+        
+        - type: "line-chart"
+          title: "API Response Time"
+          metrics:
+            - namespace: "InvoiceApp"
+              metric: "ResponseTime"
+              stat: "Average"
+              period: 60
+            - namespace: "InvoiceApp"
+              metric: "ResponseTime"
+              stat: "p95"
+              period: 60
+            - namespace: "InvoiceApp"
+              metric: "ResponseTime"
+              stat: "p99"
+              period: 60
+        
+        - type: "line-chart"
+          title: "Error Rate"
+          metrics:
+            - namespace: "InvoiceApp"
+              metric: "ErrorCount"
+              stat: "Sum"
+              period: 60
+            - namespace: "InvoiceApp"
+              metric: "ErrorRate"
+              stat: "Average"
+              period: 60
+        
+        - type: "line-chart"
+          title: "Database Performance"
+          metrics:
+            - namespace: "AWS/RDS"
+              metric: "DatabaseConnections"
+              stat: "Average"
+            - namespace: "AWS/RDS"
+              metric: "ReadLatency"
+              stat: "Average"
+            - namespace: "AWS/RDS"
+              metric: "WriteLatency"
+              stat: "Average"
+        
+        - type: "gauge"
+          title: "Active Users"
+          metrics:
+            - namespace: "InvoiceApp"
+              metric: "ActiveUsers"
+              stat: "Sum"
+        
+        - type: "number"
+          title: "Total Invoices (24h)"
+          metrics:
+            - namespace: "InvoiceApp"
+              metric: "InvoicesCreated"
+              stat: "Sum"
+              period: 86400
+
+    - name: "System Metrics"
+      widgets:
+        - type: "line-chart"
+          title: "CPU Utilization"
+          metrics:
+            - namespace: "AWS/EC2"
+              metric: "CPUUtilization"
+              stat: "Average"
+        
+        - type: "line-chart"
+          title: "Memory Usage"
+          metrics:
+            - namespace: "CWAgent"
+              metric: "mem_used_percent"
+              stat: "Average"
+        
+        - type: "line-chart"
+          title: "Network I/O"
+          metrics:
+            - namespace: "AWS/EC2"
+              metric: "NetworkIn"
+              stat: "Sum"
+            - namespace: "AWS/EC2"
+              metric: "NetworkOut"
+              stat: "Sum"
+
+alerts:
+  critical:
+    - name: "High Error Rate"
+      condition: "ErrorRate > 1% for 5 minutes"
+      metric: "InvoiceApp/ErrorRate"
+      threshold: 1
+      comparison: ">"
+      period: 300
+      datapoints: 5
+      actions:
+        - type: "SNS"
+          topic: "critical-alerts"
+        - type: "PagerDuty"
+          service: "invoice-app"
+      description: "Error rate exceeds 1% - immediate attention required"
+    
+    - name: "API Response Time Too High"
+      condition: "p95 ResponseTime > 1000ms for 5 minutes"
+      metric: "InvoiceApp/ResponseTime"
+      statistic: "p95"
+      threshold: 1000
+      comparison: ">"
+      period: 300
+      datapoints: 5
+      actions:
+        - type: "SNS"
+          topic: "critical-alerts"
+      description: "95th percentile response time exceeds 1 second"
+    
+    - name: "Database Connection Pool Exhausted"
+      condition: "DatabaseConnections > 90% of max"
+      metric: "AWS/RDS/DatabaseConnections"
+      threshold: 90  # assuming max 100 connections
+      comparison: ">"
+      period: 60
+      datapoints: 3
+      actions:
+        - type: "SNS"
+          topic: "critical-alerts"
+      description: "Database connection pool nearly exhausted"
+    
+    - name: "High Memory Usage"
+      condition: "Memory > 90%"
+      metric: "CWAgent/mem_used_percent"
+      threshold: 90
+      comparison: ">"
+      period: 300
+      datapoints: 3
+      actions:
+        - type: "SNS"
+          topic: "critical-alerts"
+      description: "Server memory usage critical"
+
+  warning:
+    - name: "Elevated Error Rate"
+      condition: "ErrorRate > 0.5% for 10 minutes"
+      metric: "InvoiceApp/ErrorRate"
+      threshold: 0.5
+      comparison: ">"
+      period: 600
+      datapoints: 5
+      actions:
+        - type: "SNS"
+          topic: "warning-alerts"
+        - type: "Email"
+          addresses: ["dev-team@example.com"]
+      description: "Error rate elevated - investigate if trend continues"
+    
+    - name: "Slow API Response"
+      condition: "p95 ResponseTime > 500ms for 10 minutes"
+      metric: "InvoiceApp/ResponseTime"
+      statistic: "p95"
+      threshold: 500
+      comparison: ">"
+      period: 600
+      datapoints: 5
+      actions:
+        - type: "SNS"
+          topic: "warning-alerts"
+      description: "API response times degrading"
+    
+    - name: "Database Query Latency High"
+      condition: "ReadLatency > 100ms"
+      metric: "AWS/RDS/ReadLatency"
+      threshold: 100
+      comparison: ">"
+      period: 300
+      datapoints: 5
+      actions:
+        - type: "SNS"
+          topic: "warning-alerts"
+      description: "Database read latency elevated"
+    
+    - name: "Increased CPU Usage"
+      condition: "CPU > 70% for 15 minutes"
+      metric: "AWS/EC2/CPUUtilization"
+      threshold: 70
+      comparison: ">"
+      period: 900
+      datapoints: 5
+      actions:
+        - type: "SNS"
+          topic: "warning-alerts"
+      description: "CPU usage elevated - consider scaling"
+
+  info:
+    - name: "High Traffic"
+      condition: "RequestRate > 1000/min"
+      metric: "InvoiceApp/RequestCount"
+      threshold: 1000
+      comparison: ">"
+      period: 60
+      datapoints: 3
+      actions:
+        - type: "SNS"
+          topic: "info-alerts"
+      description: "Traffic spike detected - monitoring for capacity"
+    
+    - name: "Low Disk Space"
+      condition: "DiskSpaceUsed > 80%"
+      metric: "CWAgent/disk_used_percent"
+      threshold: 80
+      comparison: ">"
+      period: 300
+      datapoints: 3
+      actions:
+        - type: "SNS"
+          topic: "info-alerts"
+      description: "Disk space running low"
+
+logging:
+  structured: true
+  level: "info"
+  
+  patterns:
+    - name: "API Requests"
+      format: "json"
+      fields:
+        - timestamp
+        - level: "info"
+        - method
+        - path
+        - statusCode
+        - responseTime
+        - userId
+        - requestId
+    
+    - name: "Errors"
+      format: "json"
+      fields:
+        - timestamp
+        - level: "error"
+        - error.message
+        - error.stack
+        - error.code
+        - userId
+        - requestId
+        - context
+    
+    - name: "Business Events"
+      format: "json"
+      fields:
+        - timestamp
+        - level: "info"
+        - eventName
+        - eventId
+        - userId
+        - payload
+  
+  retention:
+    application_logs: "30 days"
+    error_logs: "90 days"
+    audit_logs: "365 days"
+
+  aggregation:
+    service: "CloudWatch Logs Insights"
+    queries:
+      - name: "Top 10 Slow Endpoints"
+        query: |
+          fields @timestamp, method, path, responseTime
+          | filter statusCode = 200
+          | sort responseTime desc
+          | limit 10
+      
+      - name: "Error Breakdown by Type"
+        query: |
+          fields error.code as ErrorCode, count(*) as Count
+          | filter level = "error"
+          | stats count() by ErrorCode
+          | sort Count desc
+      
+      - name: "Requests by User"
+        query: |
+          fields userId, count(*) as RequestCount
+          | stats count() by userId
+          | sort RequestCount desc
+          | limit 20
+
+application_metrics:
+  custom_metrics:
+    - name: "InvoicesCreated"
+      type: "counter"
+      description: "Total number of invoices created"
+      dimensions:
+        - userId
+        - status
+    
+    - name: "PaymentsRecorded"
+      type: "counter"
+      description: "Total payments recorded"
+      dimensions:
+        - userId
+        - paymentMethod
+    
+    - name: "CustomersCreated"
+      type: "counter"
+      description: "Total customers created"
+      dimensions:
+        - userId
+    
+    - name: "CommandExecutionTime"
+      type: "histogram"
+      description: "Command handler execution time"
+      dimensions:
+        - commandType
+      buckets: [10, 50, 100, 200, 500, 1000, 2000]
+    
+    - name: "QueryExecutionTime"
+      type: "histogram"
+      description: "Query handler execution time"
+      dimensions:
+        - queryType
+      buckets: [10, 50, 100, 200, 500, 1000]
+    
+    - name: "EventBusLatency"
+      type: "histogram"
+      description: "Event publishing latency"
+      dimensions:
+        - eventType
+      buckets: [1, 5, 10, 50, 100, 200]
+
+health_checks:
+  - name: "API Health"
+    endpoint: "/health"
+    interval: 30  # seconds
+    timeout: 5
+    healthy_threshold: 2
+    unhealthy_threshold: 3
+  
+  - name: "Database Health"
+    type: "database"
+    connection_string: "${DATABASE_URL}"
+    query: "SELECT 1"
+    interval: 60
+    timeout: 10
+    healthy_threshold: 2
+    unhealthy_threshold: 3
+  
+  - name: "AWS Services"
+    type: "external"
+    services:
+      - "cognito"
+      - "s3"
+    interval: 300
+    timeout: 10
+
+slo_sli:
+  # Service Level Objectives / Service Level Indicators
+  slos:
+    - name: "API Availability"
+      target: "99.9%"
+      measurement: "uptime"
+      period: "30 days"
+    
+    - name: "API Response Time"
+      target: "p95 < 200ms"
+      measurement: "response_time"
+      period: "24 hours"
+    
+    - name: "Error Rate"
+      target: "< 0.1%"
+      measurement: "error_rate"
+      period: "24 hours"
+  
+  slis:
+    - name: "Request Success Rate"
+      query: "(200_responses + 201_responses) / total_requests"
+    
+    - name: "Fast Response Rate"
+      query: "responses_under_200ms / total_requests"
+
+# Implementation Notes:
+# 1. Configure CloudWatch agent on EC2 instances
+# 2. Set up SNS topics for alerts
+# 3. Implement custom metrics in application code
+# 4. Configure log aggregation
+# 5. Set up dashboards in CloudWatch console
+# 6. Test alerts with synthetic failures
+# 7. Document on-call procedures
+

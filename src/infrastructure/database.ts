@@ -1,13 +1,14 @@
 import { Pool } from 'pg';
-import { config } from '../config/env';
 
 let poolInstance: Pool | null = null;
 
 export const pool = (): Pool => {
   if (!poolInstance) {
+    // Import config lazily to avoid circular dependency issues
+    const { config } = require('../config/env');
     poolInstance = new Pool({
-  connectionString: config.DATABASE_URL,
-});
+      connectionString: config.DATABASE_URL,
+    });
   }
   return poolInstance;
 };

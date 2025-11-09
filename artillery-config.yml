@@ -1,0 +1,189 @@
+# Artillery Load Testing Configuration
+# Run with: artillery run artillery-config.yml
+
+config:
+  target: "http://localhost:3000"
+  phases:
+    # Warm-up phase
+    - duration: 60
+      arrivalRate: 5
+      name: "Warm up"
+    # Ramp up phase
+    - duration: 120
+      arrivalRate: 10
+      rampTo: 50
+      name: "Ramp up load"
+    # Sustained load phase
+    - duration: 180
+      arrivalRate: 50
+      name: "Sustained load"
+    # Peak load phase
+    - duration: 60
+      arrivalRate: 100
+      name: "Peak load"
+    # Cool down
+    - duration: 30
+      arrivalRate: 10
+      name: "Cool down"
+  
+  defaults:
+    headers:
+      Content-Type: "application/json"
+  
+  variables:
+    testUserId: "test-user-artillery"
+  
+  processor: "./artillery-processor.js"
+  
+  # Performance thresholds
+  ensure:
+    maxErrorRate: 1        # Max 1% error rate
+    p95: 200               # 95th percentile response time < 200ms
+    p99: 500               # 99th percentile response time < 500ms
+
+scenarios:
+  # Scenario 1: Customer CRUD operations
+  - name: "Customer Operations"
+    weight: 30
+    flow:
+      - post:
+          url: "/api/v1/auth/login"
+          json:
+            email: "test@example.com"
+            password: "testpassword123"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+      
+      - post:
+          url: "/api/v1/customers"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            name: "Test Customer {{ $randomString() }}"
+            email: "customer-{{ $randomString() }}@example.com"
+            address:
+              street: "123 Main St"
+              city: "Springfield"
+              state: "IL"
+              postalCode: "62701"
+              country: "USA"
+            phoneNumber: "+1-555-{{ $randomNumber(1000, 9999) }}"
+          capture:
+            - json: "$.id"
+              as: "customerId"
+      
+      - get:
+          url: "/api/v1/customers/{{ customerId }}"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+      
+      - get:
+          url: "/api/v1/customers"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+
+  # Scenario 2: Invoice workflow
+  - name: "Invoice Workflow"
+    weight: 50
+    flow:
+      - post:
+          url: "/api/v1/auth/login"
+          json:
+            email: "test@example.com"
+            password: "testpassword123"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+      
+      # Get a customer first
+      - get:
+          url: "/api/v1/customers"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          capture:
+            - json: "$.customers[0].id"
+              as: "customerId"
+      
+      # Create invoice
+      - post:
+          url: "/api/v1/invoices"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            customerId: "{{ customerId }}"
+            companyInfo: "Test Company"
+            issueDate: "{{ $now() }}"
+            dueDate: "{{ $now('+30d') }}"
+            taxRate: 8
+            notes: "Load test invoice"
+          capture:
+            - json: "$.id"
+              as: "invoiceId"
+      
+      # Add line item
+      - post:
+          url: "/api/v1/invoices/{{ invoiceId }}/line-items"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            description: "Consulting Services"
+            quantity: "{{ $randomNumber(1, 10) }}"
+            unitPrice: "{{ $randomNumber(100, 500) }}"
+      
+      # Get invoice
+      - get:
+          url: "/api/v1/invoices/{{ invoiceId }}"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+      
+      # List invoices
+      - get:
+          url: "/api/v1/invoices"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+
+  # Scenario 3: Payment recording
+  - name: "Payment Operations"
+    weight: 20
+    flow:
+      - post:
+          url: "/api/v1/auth/login"
+          json:
+            email: "test@example.com"
+            password: "testpassword123"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+      
+      # Get an invoice
+      - get:
+          url: "/api/v1/invoices?status=Sent"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          capture:
+            - json: "$.invoices[0].id"
+              as: "invoiceId"
+      
+      # Record payment
+      - post:
+          url: "/api/v1/payments"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            invoiceId: "{{ invoiceId }}"
+            amount: "{{ $randomNumber(100, 1000) }}"
+            paymentMethod: "CreditCard"
+            paymentDate: "{{ $now() }}"
+      
+      # List payments
+      - get:
+          url: "/api/v1/payments?invoiceId={{ invoiceId }}"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+
+# Plugins
+plugins:
+  expect: {}
+  metrics-by-endpoint: {}
+

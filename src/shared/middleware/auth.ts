@@ -1,17 +1,18 @@
 import { Request, Response, NextFunction } from 'express';
 import { CognitoJwtVerifier } from 'aws-jwt-verify';
-import { config } from '../../config/env';
 
 // Create JWT verifier instance lazily
 let verifier: ReturnType<typeof CognitoJwtVerifier.create> | null = null;
 
 const getVerifier = () => {
   if (!verifier) {
+    // Import config lazily to avoid circular dependency
+    const { config } = require('../../config/env');
     verifier = CognitoJwtVerifier.create({
-  userPoolId: config.AWS_COGNITO_USER_POOL_ID,
-  tokenUse: 'access',
-  clientId: config.AWS_COGNITO_CLIENT_ID,
-});
+      userPoolId: config.AWS_COGNITO_USER_POOL_ID,
+      tokenUse: 'access',
+      clientId: config.AWS_COGNITO_CLIENT_ID,
+    });
   }
   return verifier;
 };

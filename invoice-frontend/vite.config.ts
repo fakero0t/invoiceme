@@ -20,6 +20,8 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
+    minify: 'esbuild',
+    cssMinify: true,
     rollupOptions: {
       output: {
         manualChunks: {
@@ -29,5 +31,8 @@ export default defineConfig({
       },
     },
     chunkSizeWarningLimit: 1000,
+  },
+  css: {
+    devSourcemap: true,
   },
 });

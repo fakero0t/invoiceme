@@ -13,9 +13,13 @@
     "test:integration": "jest --testPathPattern=integration",
     "test:coverage": "jest --coverage",
     "test:watch": "jest --watch",
+    "test:smoke": "jest --testPathPattern=smoke --runInBand",
+    "test:perf": "artillery run artillery-config.yml",
+    "test:perf:report": "artillery run --output perf-report.json artillery-config.yml",
     "migrate:up": "node-pg-migrate up",
     "migrate:down": "node-pg-migrate down",
     "migrate:create": "node-pg-migrate create",
+    "seed:test": "node scripts/seed-test-data.js",
     "lint": "eslint src --ext .ts",
     "format": "prettier --write \"src/**/*.ts\""
   },
@@ -41,8 +45,10 @@
     "express-rate-limit": "^8.2.1",
     "helmet": "^8.1.0",
     "pg": "^8.16.3",
+    "reflect-metadata": "^0.2.1",
     "swagger-jsdoc": "^6.2.8",
-    "swagger-ui-express": "^5.0.1"
+    "swagger-ui-express": "^5.0.1",
+    "tsyringe": "^4.8.0"
   },
   "devDependencies": {
     "@jest/globals": "^30.2.0",

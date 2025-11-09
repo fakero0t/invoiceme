@@ -70,7 +70,7 @@ const router = createRouter({
 });
 
 // Navigation guards - TEMPORARILY DISABLED FOR DEVELOPMENT
-router.beforeEach(async (to, _from, next) => {
+router.beforeEach((to, _from, next) => {
   console.log('🔓 Auth bypassed for development - navigating to:', to.path);
   
   // Skip all auth checks for now

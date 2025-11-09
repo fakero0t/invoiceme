@@ -1,3 +1,7 @@
+console.log('🚀 Starting backend application...');
+console.log('📦 Loading dependencies...');
+
+import 'reflect-metadata';
 import express, { Application } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -5,22 +9,85 @@ import compression from 'compression';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import swaggerUi from 'swagger-ui-express';
-import { config, validateEnv } from './config/env';
-import { getSwaggerSpec } from './config/swagger';
-import authRouter from './features/auth/authRouter';
-import customerRouter from './features/customers/customerRouter';
-import invoiceRouter from './features/invoices/invoiceRouter';
-import paymentRouter from './features/payments/paymentRouter';
-import { getLimiter } from './shared/middleware/rateLimiter';
+import { validateEnv } from './config/env';
+
+// These will be imported after validateEnv() runs to avoid circular dependency issues
+let getSwaggerSpec: any;
+let authRouter: any;
+let customerRouter: any;
+let invoiceRouter: any;
+let paymentRouter: any;
+let getLimiter: any;
+let pool: any;
+let configureDependencies: any;
+let container: any;
+let errorHandler: any;
+let createCustomerRoutes: any;
+let createInvoiceRoutes: any;
+let createPaymentRoutes: any;
+let createDashboardRoutes: any;
+let authMiddleware: any;
+
+// Global error handlers (must be at the top)
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught Exception:', error);
+  process.exit(1);
+});
 
 // Load environment variables
 dotenv.config();
 
 // Validate environment variables on startup
-validateEnv();
+try {
+  console.log('🔍 Validating environment variables...');
+  validateEnv();
+  console.log('✅ Environment variables validated');
+} catch (error) {
+  console.error('❌ Environment validation failed:', error);
+  process.exit(1);
+}
+
+// Import config after validation (lazy import to avoid circular dependency)
+const { config } = require('./config/env');
+
+// Now import all application modules that might use config
+console.log('📦 Loading application modules...');
+getSwaggerSpec = require('./config/swagger').getSwaggerSpec;
+authRouter = require('./features/auth/authRouter').default;
+customerRouter = require('./features/customers/customerRouter').default;
+invoiceRouter = require('./features/invoices/invoiceRouter').default;
+paymentRouter = require('./features/payments/paymentRouter').default;
+getLimiter = require('./shared/middleware/rateLimiter').getLimiter;
+pool = require('./infrastructure/database').pool;
+const diModule = require('./infrastructure/configuration/DependencyContainer');
+configureDependencies = diModule.configureDependencies;
+container = diModule.container;
+errorHandler = require('./presentation/middleware/ErrorHandlerMiddleware').errorHandler;
+createCustomerRoutes = require('./presentation/routes/customerRoutes').createCustomerRoutes;
+createInvoiceRoutes = require('./presentation/routes/invoiceRoutes').createInvoiceRoutes;
+createPaymentRoutes = require('./presentation/routes/paymentRoutes').createPaymentRoutes;
+createDashboardRoutes = require('./presentation/routes/dashboardRoutes').createDashboardRoutes;
+authMiddleware = require('./shared/middleware/auth').authMiddleware;
+console.log('✅ Application modules loaded');
+
+// Initialize dependency injection container
+try {
+  console.log('🔧 Initializing dependency injection container...');
+  configureDependencies(pool());
+  console.log('✅ Dependency injection container initialized');
+} catch (error) {
+  console.error('❌ Dependency injection initialization failed:', error);
+  process.exit(1);
+}
 
 const app: Application = express();
 const PORT = config.PORT;
+const USE_NEW_ARCHITECTURE = process.env.USE_NEW_ARCHITECTURE === 'true';
 
 // Security middleware
 app.use(helmet({
@@ -62,20 +129,58 @@ app.get('/health', (_req, res) => {
 });
 
 // API Documentation
-app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(getSwaggerSpec()));
+try {
+  console.log('📚 Initializing API documentation...');
+  const swaggerSpec = getSwaggerSpec();
+  app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+  console.log('✅ API documentation initialized');
+} catch (error) {
+  console.error('⚠️  Failed to initialize API documentation:', error);
+  // Don't exit - API docs are optional
+}
 
 // API Routes
 app.use('/api/v1/auth', authRouter);
-app.use('/api/v1/customers', customerRouter);
-app.use('/api/v1/invoices', invoiceRouter);
-app.use('/api/v1', paymentRouter); // Payment routes include their own paths
+
+// Feature flag: Use new CQRS architecture or old implementation
+if (USE_NEW_ARCHITECTURE) {
+  console.log('🚀 Using new CQRS architecture');
+  app.use('/api/v1/customers', authMiddleware, createCustomerRoutes(container));
+  app.use('/api/v1/invoices', authMiddleware, createInvoiceRoutes(container));
+  app.use('/api/v1/payments', authMiddleware, createPaymentRoutes(container));
+  app.use('/api/v1/dashboard', authMiddleware, createDashboardRoutes(container));
+} else {
+  console.log('⚙️  Using legacy architecture');
+  app.use('/api/v1/customers', customerRouter);
+  app.use('/api/v1/invoices', invoiceRouter);
+  app.use('/api/v1', paymentRouter);
+  app.use('/api/v1/dashboard', authMiddleware, createDashboardRoutes(container));
+}
+
+// Error handler middleware (MUST BE LAST)
+app.use(errorHandler);
 
 // Start server
-const server = app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`📝 Environment: ${config.NODE_ENV}`);
-  console.log(`📚 API Docs available at http://localhost:${PORT}/api/docs`);
-});
+try {
+  console.log('🚀 Starting server...');
+  const server = app.listen(PORT, () => {
+    console.log(`✅ Server running on http://localhost:${PORT}`);
+    console.log(`📝 Environment: ${config.NODE_ENV}`);
+    console.log(`📚 API Docs available at http://localhost:${PORT}/api/docs`);
+  });
+
+  server.on('error', (error: NodeJS.ErrnoException) => {
+    if (error.code === 'EADDRINUSE') {
+      console.error(`❌ Port ${PORT} is already in use`);
+    } else {
+      console.error('❌ Server error:', error);
+    }
+    process.exit(1);
+  });
+} catch (error) {
+  console.error('❌ Failed to start server:', error);
+  process.exit(1);
+}
 
 // Graceful shutdown
 const gracefulShutdown = () => {

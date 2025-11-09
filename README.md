@@ -205,12 +205,45 @@ npm run preview
 
 ## Testing
 
+### Backend Tests
+
 ```bash
-# Run backend tests
+# Run all tests
 npm test
 
+# Run unit tests only
+npm run test:unit
+
+# Run integration tests only
+npm run test:integration
+
 # Run with coverage
-npm test -- --coverage
+npm run test:coverage
+
+# Run performance tests
+npm run test:perf
+
+# Watch mode
+npm run test:watch
+```
+
+### Test Coverage Targets
+- **Domain Layer**: >90% coverage
+- **Application Layer**: >85% coverage
+- **Integration Tests**: 20+ tests
+- **Unit Tests**: 100+ tests
+- **Overall Coverage**: >80%
+
+### Frontend Tests
+
+```bash
+cd invoice-frontend
+
+# Run E2E tests
+npm run test:e2e
+
+# Run E2E tests in headless mode
+npm run test:e2e:ci
 ```
 
 ## API Health Check
@@ -229,27 +262,99 @@ Expected response:
 }
 ```
 
-## Architecture Decisions
+## Architecture Overview
 
 ### Domain-Driven Design (DDD)
 
-- **Domain Layer**: Contains business logic, entities, and value objects
-- **Application Layer**: Use cases and application services
-- **Infrastructure Layer**: Database access, external APIs
-- **Presentation Layer**: API endpoints and request/response handling
+The application follows DDD principles with clear bounded contexts:
+
+**Bounded Contexts:**
+- **Customer Context**: Customer management and relationships
+- **Invoice Context**: Invoice creation, line items, and lifecycle
+- **Payment Context**: Payment tracking and reconciliation
+- **User Context**: Authentication and user management
+
+**Domain Layer Components:**
+- **Entities**: Customer, Invoice, LineItem, Payment
+- **Value Objects**: Money, Email, Address, PhoneNumber, InvoiceNumber
+- **Aggregates**: Customer (root), Invoice (root with LineItems)
+- **Domain Events**: CustomerCreated, InvoiceCreated, InvoiceSent, PaymentRecorded
 
 ### CQRS (Command Query Responsibility Segregation)
 
-- **Commands**: Operations that modify state (Create, Update, Delete)
-- **Queries**: Operations that read state (Get, List, Search)
-- Separate models for read and write operations
+Clear separation between write and read operations:
+
+**Commands (13 total):**
+- **Customer**: CreateCustomer, UpdateCustomer, DeleteCustomer
+- **Invoice**: CreateInvoice, AddLineItem, UpdateLineItem, RemoveLineItem, UpdateInvoice, MarkInvoiceAsSent, MarkInvoiceAsPaid, DeleteInvoice, GenerateInvoicePDF
+- **Payment**: RecordPayment
+
+**Queries (7 total):**
+- **Customer**: GetCustomer, ListCustomers
+- **Invoice**: GetInvoice, ListInvoices, GetInvoiceWithPayments
+- **Payment**: GetPayment, ListPayments
+
+### Architecture Layers
+
+```
+┌─────────────────────────────────────────┐
+│   Presentation Layer (API Routes)       │
+│   - Express routes                       │
+│   - Request/response handling           │
+└──────────────┬──────────────────────────┘
+               │
+┌──────────────▼──────────────────────────┐
+│   Application Layer (Use Cases)         │
+│   - Command Handlers                     │
+│   - Query Handlers                       │
+│   - DTOs and Mappers                     │
+└──────────────┬──────────────────────────┘
+               │
+┌──────────────▼──────────────────────────┐
+│   Domain Layer (Business Logic)         │
+│   - Entities & Aggregates                │
+│   - Value Objects                        │
+│   - Domain Events                        │
+│   - Business Rules                       │
+└──────────────┬──────────────────────────┘
+               │
+┌──────────────▼──────────────────────────┐
+│   Infrastructure Layer                   │
+│   - PostgreSQL repositories              │
+│   - AWS Cognito (auth)                   │
+│   - AWS S3 (storage)                     │
+│   - External APIs                        │
+└─────────────────────────────────────────┘
+```
 
 ### Vertical Slice Architecture
 
-- Features are organized by business capability
-- Each slice contains all layers (domain, application, infrastructure, presentation)
-- Reduces coupling between features
-- Easier to maintain and test individual features
+Features organized by business capability:
+
+```
+features/
+├── auth/          # Authentication & authorization
+├── customers/     # Customer management
+├── invoices/      # Invoice operations
+└── payments/      # Payment tracking
+```
+
+Each feature contains:
+- Routes (presentation)
+- Command/Query handlers (application)
+- Domain logic (if feature-specific)
+- Tests
+
+### Key Design Patterns
+
+1. **Repository Pattern**: Abstract data access
+2. **Command Pattern**: Encapsulate operations
+3. **Factory Pattern**: Entity creation
+4. **Event Bus Pattern**: Domain event handling
+5. **DTO Pattern**: Data transfer objects
+6. **Mapper Pattern**: Entity-DTO conversion
+
+For detailed architecture documentation, see [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ## Contributing
 

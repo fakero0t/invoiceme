@@ -3,9 +3,6 @@ import { createPinia } from 'pinia';
 import App from './App.vue';
 import router from './router';
 
-// Import global styles - ORDER MATTERS!
-import './styles/index.css';
-
 console.log('🚀 Starting Invoice MVP Frontend...');
 console.log('🔓 Auth disabled - Development Mode');
 
@@ -21,3 +18,8 @@ app.use(router);
 console.log('🎨 Mounting app...');
 app.mount('#app');
 console.log('✅ App mounted successfully!');
+
+// Load CSS asynchronously after app mounts to prevent blocking
+import('./styles/index.css').then(() => {
+  console.log('✅ Styles loaded!');
+});

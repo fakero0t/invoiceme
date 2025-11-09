@@ -1,24 +1,27 @@
 import swaggerJsdoc from 'swagger-jsdoc';
-import { config } from './env';
 
-const getOptions = (): swaggerJsdoc.Options => ({
-  definition: {
-    openapi: '3.0.0',
-    info: {
-      title: 'Invoice MVP API',
-      version: '1.0.0',
-      description:
-        'Invoice management system API with authentication, customers, invoices, and payments',
-      contact: {
-        name: 'API Support',
+const getOptions = (): swaggerJsdoc.Options => {
+  // Import config lazily to avoid circular dependency
+  const { config } = require('./env');
+  
+  return {
+    definition: {
+      openapi: '3.0.0',
+      info: {
+        title: 'Invoice MVP API',
+        version: '1.0.0',
+        description:
+          'Invoice management system API with authentication, customers, invoices, and payments',
+        contact: {
+          name: 'API Support',
+        },
       },
-    },
-    servers: [
-      {
-        url: `http://localhost:${config.PORT}/api/v1`,
-        description: 'Development server',
-      },
-    ],
+      servers: [
+        {
+          url: `http://localhost:${config.PORT}/api/v1`,
+          description: 'Development server',
+        },
+      ],
     components: {
       securitySchemes: {
         BearerAuth: {
@@ -261,14 +264,15 @@ const getOptions = (): swaggerJsdoc.Options => ({
         },
       },
     },
-    security: [
-      {
-        BearerAuth: [],
-      },
-    ],
-  },
-  apis: ['./src/features/**/*.ts', './src/shared/**/*.ts'],
-});
+      security: [
+        {
+          BearerAuth: [],
+        },
+      ],
+    },
+    apis: ['./src/features/**/*.ts', './src/shared/**/*.ts'],
+  };
+};
 
 export const getSwaggerSpec = () => swaggerJsdoc(getOptions());
 

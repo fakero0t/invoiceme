@@ -10,7 +10,11 @@
     "type-check": "vue-tsc --noEmit",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore",
     "check:tokens": "grep -r '#[0-9A-Fa-f]\\{6\\}' src/ --exclude-dir=node_modules --exclude='*.css' || echo 'No hardcoded colors found!'",
-    "validate:design-system": "npm run lint && npm run check:tokens"
+    "validate:design-system": "npm run lint && npm run check:tokens",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:report": "playwright show-report"
   },
   "dependencies": {
     "vue": "^3.5.13",
@@ -25,6 +29,7 @@
     "vue-tsc": "^2.2.0",
     "tailwindcss": "^3.4.17",
     "postcss": "^8.4.49",
-    "autoprefixer": "^10.4.21"
+    "autoprefixer": "^10.4.21",
+    "@playwright/test": "^1.40.0"
   }
 }

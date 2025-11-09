@@ -187,6 +187,18 @@ import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { MainLayout } from '../shared/layouts';
 import { VCard, VButton, VAvatar, VEmptyState, VSkeleton } from '../shared/components';
+import { DashboardApiService } from '../Infrastructure/Http/DashboardApiService';
+import type { RecentActivityItem as RecentActivityItemDTO } from '../Application/DTOs/DashboardStatisticsDTO';
+
+interface RecentActivityItem {
+  id: string;
+  customerName: string;
+  description: string;
+  amount: number;
+  status: 'paid' | 'pending' | 'overdue';
+  timestamp: Date;
+  type: 'invoice' | 'payment';
+}
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -207,54 +219,17 @@ const bottomNavItems = [
 
 // Data
 const isLoading = ref(true);
-const totalOutstanding = ref(24580.50);
-const paidThisMonth = ref(15240.00);
-const pendingCount = ref(8);
-const totalPaid = ref(45230.00);
-const totalPending = ref(12340.00);
-const totalInvoices = ref(42);
-const totalRevenue = ref(87560.00);
-const overdueCount = ref(3);
-const totalOverdue = ref(4250.00);
+const totalOutstanding = ref(0);
+const paidThisMonth = ref(0);
+const pendingCount = ref(0);
+const totalPaid = ref(0);
+const totalPending = ref(0);
+const totalInvoices = ref(0);
+const totalRevenue = ref(0);
+const overdueCount = ref(0);
+const totalOverdue = ref(0);
 
-const recentActivity = ref([
-  {
-    id: 1,
-    customerName: 'Acme Corporation',
-    description: 'Invoice #1001 sent',
-    amount: 2500.00,
-    status: 'pending',
-    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-    type: 'invoice'
-  },
-  {
-    id: 2,
-    customerName: 'Tech Solutions Inc',
-    description: 'Payment received for Invoice #998',
-    amount: 3200.00,
-    status: 'paid',
-    timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000), // 5 hours ago
-    type: 'payment'
-  },
-  {
-    id: 3,
-    customerName: 'Design Studio',
-    description: 'Invoice #999 overdue',
-    amount: 1800.00,
-    status: 'overdue',
-    timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
-    type: 'invoice'
-  },
-  {
-    id: 4,
-    customerName: 'Marketing Agency',
-    description: 'Invoice #1000 paid',
-    amount: 4500.00,
-    status: 'paid',
-    timestamp: new Date(Date.now() - 48 * 60 * 60 * 1000), // 2 days ago
-    type: 'payment'
-  },
-]);
+const recentActivity = ref<RecentActivityItem[]>([]);
 
 // Methods
 function formatCurrency(amount: number): string {
@@ -289,11 +264,34 @@ function navigateToActivity(activity: any) {
   }
 }
 
-// Simulate loading
-onMounted(() => {
-  setTimeout(() => {
+// Load dashboard data
+onMounted(async () => {
+  isLoading.value = true;
+  try {
+    const stats = await DashboardApiService.getStatistics();
+    
+    // Map API response to component state
+    totalOutstanding.value = stats.totalOutstanding;
+    paidThisMonth.value = stats.paidThisMonth;
+    pendingCount.value = stats.pendingCount;
+    totalPaid.value = stats.totalPaid;
+    totalPending.value = stats.totalPending;
+    totalInvoices.value = stats.totalInvoices;
+    totalRevenue.value = stats.totalRevenue;
+    overdueCount.value = stats.overdueCount;
+    totalOverdue.value = stats.totalOverdue;
+    
+    // Transform recentActivity timestamps from ISO strings to Date objects
+    recentActivity.value = stats.recentActivity.map(activity => ({
+      ...activity,
+      timestamp: new Date(activity.timestamp)
+    }));
+  } catch (error) {
+    console.error('Failed to load dashboard statistics:', error);
+    // Optionally show error message to user
+  } finally {
     isLoading.value = false;
-  }, 800);
+  }
 });
 </script>
 
