@@ -2,7 +2,9 @@ import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import App from './App.vue';
 import router from './router';
-import './style.css';
+
+// Import global styles - ORDER MATTERS!
+import './styles/index.css';
 
 console.log('🚀 Starting Invoice MVP Frontend...');
 console.log('🔓 Auth disabled - Development Mode');

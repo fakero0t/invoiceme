@@ -1,73 +1,65 @@
 import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
-import Home from '../views/Home.vue';
-import Dashboard from '../views/Dashboard.vue';
-import LoginPage from '../features/auth/LoginPage.vue';
-import SignupPage from '../features/auth/SignupPage.vue';
-import CustomerList from '../views/customers/CustomerList.vue';
-import CustomerForm from '../views/customers/CustomerForm.vue';
-import InvoiceList from '../views/invoices/InvoiceList.vue';
-import InvoiceForm from '../views/invoices/InvoiceForm.vue';
 
 const routes: Array<RouteRecordRaw> = [
   {
     path: '/',
     name: 'Home',
-    component: Home,
+    component: () => import('../views/Home.vue'),
     meta: { requiresAuth: false },
   },
   {
     path: '/login',
     name: 'Login',
-    component: LoginPage,
+    component: () => import('../features/auth/LoginPage.vue'),
     meta: { requiresAuth: false, requiresGuest: true },
   },
   {
     path: '/signup',
     name: 'Signup',
-    component: SignupPage,
+    component: () => import('../features/auth/SignupPage.vue'),
     meta: { requiresAuth: false, requiresGuest: true },
   },
   {
     path: '/dashboard',
     name: 'Dashboard',
-    component: Dashboard,
+    component: () => import('../views/Dashboard.vue'),
     meta: { requiresAuth: true },
   },
   {
     path: '/customers',
     name: 'CustomerList',
-    component: CustomerList,
+    component: () => import('../views/customers/CustomerList.vue'),
     meta: { requiresAuth: true },
   },
   {
     path: '/customers/new',
     name: 'CustomerCreate',
-    component: CustomerForm,
+    component: () => import('../views/customers/CustomerForm.vue'),
     meta: { requiresAuth: true },
   },
   {
     path: '/customers/:id/edit',
     name: 'CustomerEdit',
-    component: CustomerForm,
+    component: () => import('../views/customers/CustomerForm.vue'),
     meta: { requiresAuth: true },
   },
   {
     path: '/invoices',
     name: 'InvoiceList',
-    component: InvoiceList,
+    component: () => import('../views/invoices/InvoiceList.vue'),
     meta: { requiresAuth: true },
   },
   {
     path: '/invoices/new',
     name: 'InvoiceCreate',
-    component: InvoiceForm,
+    component: () => import('../views/invoices/InvoiceForm.vue'),
     meta: { requiresAuth: true },
   },
   {
     path: '/invoices/:id/edit',
     name: 'InvoiceEdit',
-    component: InvoiceForm,
+    component: () => import('../views/invoices/InvoiceForm.vue'),
     meta: { requiresAuth: true },
   },
 ];

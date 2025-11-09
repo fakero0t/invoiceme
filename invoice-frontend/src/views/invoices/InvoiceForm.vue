@@ -1,285 +1,392 @@
 <template>
+  <MainLayout
+    :sidebar-items="sidebarItems"
+    :bottom-nav-items="bottomNavItems"
+  >
   <div class="invoice-form-page">
-    <div class="form-header">
-      <h1>{{ isEditMode ? 'Edit Invoice' : 'Create Invoice' }}</h1>
-      <router-link to="/invoices" class="btn-secondary">Cancel</router-link>
+      <!-- Breadcrumbs -->
+      <VBreadcrumbs :items="breadcrumbs" class="breadcrumbs" />
+
+      <!-- Page Header -->
+      <div class="page-header">
+        <h1 class="page-title">{{ isEditMode ? 'Edit Invoice' : 'Create Invoice' }}</h1>
+        <VButton variant="ghost" @click="goBack" v-if="!isMobile">
+          Cancel
+        </VButton>
     </div>
 
-    <!-- Error Display -->
-    <div v-if="invoiceStore.error" class="error-message">
-      {{ invoiceStore.error }}
-      <button @click="invoiceStore.clearError()" class="close-btn">×</button>
-    </div>
-
-    <!-- Invoice Form -->
-    <div class="form-section-card">
+      <!-- Invoice Details -->
+      <VCard class="form-section-card">
       <h2 class="section-title">Invoice Details</h2>
       
       <div class="form-row-grid">
         <!-- Customer Selection -->
-        <div class="form-group">
-          <label>
+          <div class="form-field">
+            <label for="customer" class="form-label">
             Customer <span class="required">*</span>
           </label>
-          <select
+            <VSelect
+              id="customer"
             v-model="form.customerId"
+              :options="customerOptions"
             :disabled="isEditMode || isLoadingCustomers"
-            class="form-input"
-          >
-            <option value="">{{ isLoadingCustomers ? 'Loading customers...' : 'Select a customer' }}</option>
-            <option v-for="customer in customers" :key="customer.id" :value="customer.id">
-              {{ customer.name }} ({{ customer.email }})
-            </option>
-          </select>
-          <p v-if="customers.length === 0 && !isLoadingCustomers" class="form-error">
-            No customers found. <router-link to="/customers/new" class="error-link">Create one first</router-link>.
+              :error="!!errors.customerId"
+              :helper-text="errors.customerId"
+            />
+            <p v-if="customers.length === 0 && !isLoadingCustomers" class="helper-text error-helper">
+              No customers found. <router-link to="/customers/new" class="helper-link">Create one first</router-link>.
           </p>
         </div>
 
         <!-- Company Info -->
-        <div class="form-group">
-          <label>Company Info</label>
-          <input
+          <div class="form-field">
+            <label for="companyInfo" class="form-label">
+              Company Info
+            </label>
+            <VInput
+              id="companyInfo"
             v-model="form.companyInfo"
-            type="text"
-            placeholder="Your company name and address"
-            class="form-input"
+              placeholder="Your company name"
+              :disabled="isLoading"
           />
         </div>
 
         <!-- Issue Date -->
-        <div class="form-group">
-          <label>Issue Date</label>
-          <input
+          <div class="form-field">
+            <label for="issueDate" class="form-label">
+              Issue Date
+            </label>
+            <VInput
+              id="issueDate"
             v-model="form.issueDate"
             type="date"
-            :disabled="isEditMode"
-            class="form-input"
+              :disabled="isEditMode || isLoading"
           />
         </div>
 
         <!-- Due Date -->
-        <div class="form-group">
-          <label>Due Date</label>
-          <input
+          <div class="form-field">
+            <label for="dueDate" class="form-label">
+              Due Date
+            </label>
+            <VInput
+              id="dueDate"
             v-model="form.dueDate"
             type="date"
-            class="form-input"
+              :disabled="isLoading"
           />
         </div>
 
         <!-- Tax Rate -->
-        <div class="form-group">
-          <label>Tax Rate (%)</label>
-          <input
+          <div class="form-field">
+            <label for="taxRate" class="form-label">
+              Tax Rate (%)
+            </label>
+            <VInput
+              id="taxRate"
             v-model.number="form.taxRate"
             type="number"
             step="0.01"
             min="0"
             max="100"
-            :disabled="isEditMode"
-            class="form-input"
+              :disabled="isEditMode || isLoading"
+              placeholder="0.00"
           />
         </div>
       </div>
 
+        <VDivider />
+
       <!-- Notes -->
-      <div class="form-group">
-        <label>Notes</label>
-        <textarea
+        <div class="form-field">
+          <label for="notes" class="form-label">
+            Notes
+          </label>
+          <VTextarea
+            id="notes"
           v-model="form.notes"
-          rows="3"
-          placeholder="Additional notes..."
-          class="form-input"
-        ></textarea>
+            :rows="3"
+            placeholder="Additional notes or instructions..."
+            :disabled="isLoading"
+          />
       </div>
 
       <!-- Terms -->
-      <div class="form-group">
-        <label>Terms</label>
-        <textarea
+        <div class="form-field">
+          <label for="terms" class="form-label">
+            Payment Terms
+          </label>
+          <VTextarea
+            id="terms"
           v-model="form.terms"
-          rows="2"
-          placeholder="Payment terms..."
-          class="form-input"
-        ></textarea>
+            :rows="2"
+            placeholder="Payment terms and conditions..."
+            :disabled="isLoading"
+          />
       </div>
-    </div>
+      </VCard>
 
-    <!-- Line Items (Both Create and Edit Mode) -->
-    <div class="form-section-card">
+      <!-- Line Items -->
+      <VCard class="form-section-card">
       <div class="section-header">
         <h2 class="section-title">Line Items</h2>
-        <button
+          <VButton
           v-if="!isEditMode || invoiceStore.currentInvoice?.status === 'Draft'"
+            variant="primary"
+            size="sm"
           @click="showAddLineItemForm = true"
-          class="btn-small btn-primary"
-        >
-          Add Line Item
-        </button>
+            :disabled="showAddLineItemForm"
+          >
+            <svg class="btn-icon" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+            </svg>
+            Add Item
+          </VButton>
       </div>
 
       <!-- Add Line Item Form -->
-      <div v-if="showAddLineItemForm" class="line-item-form">
+        <VCard v-if="showAddLineItemForm" class="line-item-form">
         <h3 class="line-item-form-title">New Line Item</h3>
         <div class="line-item-grid">
-          <div class="form-group">
-            <label>Description</label>
-            <input
+            <div class="form-field">
+              <label for="description" class="form-label">Description</label>
+              <VInput
+                id="description"
               v-model="newLineItem.description"
-              type="text"
-              class="form-input"
+                placeholder="Service or product description"
             />
           </div>
-          <div class="form-group">
-            <label>Quantity</label>
-            <input
+            <div class="form-field">
+              <label for="quantity" class="form-label">Quantity</label>
+              <VInput
+                id="quantity"
               v-model.number="newLineItem.quantity"
               type="number"
-              step="0.0001"
+                step="0.01"
               min="0"
-              class="form-input"
             />
           </div>
-          <div class="form-group">
-            <label>Unit Price</label>
-            <input
+            <div class="form-field">
+              <label for="unitPrice" class="form-label">Unit Price</label>
+              <VInput
+                id="unitPrice"
               v-model.number="newLineItem.unitPrice"
               type="number"
-              step="0.0001"
+                step="0.01"
               min="0"
-              class="form-input"
+                placeholder="0.00"
             />
           </div>
         </div>
         <div class="form-actions-inline">
-          <button
-            @click="handleAddLineItem"
-            class="btn-small btn-success"
-          >
-            Save
-          </button>
-          <button
-            @click="cancelAddLineItem"
-            class="btn-small btn-secondary"
-          >
-            Cancel
-          </button>
+            <VButton variant="primary" size="sm" @click="handleAddLineItem">
+              Save Item
+            </VButton>
+            <VButton variant="ghost" size="sm" @click="cancelAddLineItem">
+              Cancel
+            </VButton>
+          </div>
+        </VCard>
+
+        <!-- Line Items List -->
+        <div v-if="displayLineItems.length > 0" class="line-items-list">
+          <!-- Mobile Cards -->
+          <div v-if="isMobile" class="line-items-mobile">
+            <VCard
+              v-for="(item, index) in displayLineItems"
+              :key="item.id || item.tempId"
+              class="line-item-card"
+            >
+              <div class="line-item-header">
+                <span class="item-number">#{{ index + 1 }}</span>
+                <VButton
+                  v-if="!isEditMode || invoiceStore.currentInvoice?.status === 'Draft'"
+                  variant="ghost"
+                  size="sm"
+                  @click="handleRemoveLineItem(item.id || item.tempId)"
+                >
+                  <svg class="icon-md" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                  </svg>
+                </VButton>
         </div>
+              <div class="line-item-description">{{ item.description }}</div>
+              <div class="line-item-details">
+                <div class="detail-item">
+                  <span class="detail-label">Qty:</span>
+                  <span class="detail-value">{{ item.quantity }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Price:</span>
+                  <span class="detail-value">${{ item.unitPrice.toFixed(2) }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Total:</span>
+                  <span class="detail-value amount">${{ (item.quantity * item.unitPrice).toFixed(2) }}</span>
+                </div>
+              </div>
+            </VCard>
       </div>
 
-      <!-- Line Items Table -->
-      <div v-if="displayLineItems.length > 0" class="table-container">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Description</th>
-              <th>Quantity</th>
-              <th>Unit Price</th>
-              <th>Amount</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="item in displayLineItems" :key="item.id || item.tempId">
-              <td>{{ item.description }}</td>
-              <td>{{ item.quantity }}</td>
-              <td>${{ item.unitPrice.toFixed(2) }}</td>
-              <td class="amount-cell">${{ (item.quantity * item.unitPrice).toFixed(2) }}</td>
-              <td>
-                <button
+          <!-- Desktop Table -->
+          <VTable
+            v-else
+            :columns="lineItemColumns"
+            :rows="lineItemRows"
+          >
+            <template #cell-description="{ row }">
+              <span class="description-cell">{{ row.description }}</span>
+            </template>
+            <template #cell-quantity="{ row }">
+              <span>{{ row.quantity }}</span>
+            </template>
+            <template #cell-unitPrice="{ row }">
+              <span>${{ row.unitPrice.toFixed(2) }}</span>
+            </template>
+            <template #cell-amount="{ row }">
+              <span class="amount-cell">${{ (row.quantity * row.unitPrice).toFixed(2) }}</span>
+            </template>
+            <template #cell-actions="{ row }">
+              <VButton
                   v-if="!isEditMode || invoiceStore.currentInvoice?.status === 'Draft'"
-                  @click="handleRemoveLineItem(item.id || item.tempId)"
-                  class="btn-small btn-delete"
+                variant="ghost"
+                size="sm"
+                @click="handleRemoveLineItem(row.id || row.tempId)"
                 >
                   Remove
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div v-else class="empty-state">
-        No line items yet. Click "Add Line Item" to add one.
+              </VButton>
+            </template>
+          </VTable>
       </div>
 
-      <!-- Invoice Totals -->
+        <!-- Empty State -->
+        <VEmptyState
+          v-else
+          title="No line items yet"
+          description="Add items to this invoice"
+          icon="document"
+        >
+          <template #action>
+            <VButton variant="primary" @click="showAddLineItemForm = true">
+              Add Your First Item
+            </VButton>
+          </template>
+        </VEmptyState>
+
+        <!-- Totals Section -->
       <div v-if="displayLineItems.length > 0" class="totals-section">
         <div class="totals-box">
           <div class="total-row">
-            <span>Subtotal:</span>
-            <span>${{ calculatedSubtotal.toFixed(2) }}</span>
+              <span class="total-label">Subtotal:</span>
+              <span class="total-value">${{ calculatedSubtotal.toFixed(2) }}</span>
           </div>
           <div class="total-row">
-            <span>Tax ({{ form.taxRate }}%):</span>
-            <span>${{ calculatedTax.toFixed(2) }}</span>
+              <span class="total-label">Tax ({{ form.taxRate }}%):</span>
+              <span class="total-value">${{ calculatedTax.toFixed(2) }}</span>
           </div>
+            <VDivider />
           <div class="total-row total-row-final">
-            <span>Total:</span>
-            <span>${{ calculatedTotal.toFixed(2) }}</span>
+              <span class="total-label">Total:</span>
+              <span class="total-value">${{ calculatedTotal.toFixed(2) }}</span>
           </div>
         </div>
       </div>
-    </div>
+      </VCard>
 
     <!-- Payment History (Edit Mode, Sent/Paid only) -->
-    <div v-if="isEditMode && invoiceStore.currentInvoice && (invoiceStore.currentInvoice.status === 'Sent' || invoiceStore.currentInvoice.status === 'Paid')" class="form-section-card">
+      <VCard
+        v-if="isEditMode && invoiceStore.currentInvoice && (invoiceStore.currentInvoice.status === 'Sent' || invoiceStore.currentInvoice.status === 'Paid')"
+        class="form-section-card"
+      >
       <div class="section-header">
+          <div>
         <h2 class="section-title">Payment History</h2>
-        <div class="balance-display">
-          <div class="balance-label">Current Balance</div>
-          <div class="balance-amount" :class="paymentStore.balance > 0 ? 'balance-due' : 'balance-paid'">
+            <div class="balance-info">
+              <span class="balance-label">Balance:</span>
+              <span class="balance-amount" :class="paymentStore.balance > 0 ? 'balance-due' : 'balance-paid'">
             ${{ paymentStore.balance.toFixed(2) }}
+              </span>
           </div>
         </div>
-      </div>
-
-      <!-- Record Payment Button -->
-      <button
+          <VButton
         v-if="paymentStore.balance > 0"
+            variant="success"
         @click="showPaymentModal = true"
-        class="btn-success payment-btn"
       >
         Record Payment
-      </button>
+          </VButton>
+        </div>
 
       <!-- Fully Paid Badge -->
-      <div v-if="paymentStore.balance === 0" class="success-message">
-        <span class="success-icon">✓</span> Invoice Fully Paid
-        <span v-if="invoiceStore.currentInvoice.paidDate" class="paid-date">
-          on {{ formatDate(invoiceStore.currentInvoice.paidDate) }}
-        </span>
+        <VCard v-if="paymentStore.balance === 0" class="success-banner">
+          <div class="success-content">
+            <svg class="success-icon" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+            </svg>
+            <div>
+              <div class="success-title">Invoice Fully Paid</div>
+              <div v-if="invoiceStore.currentInvoice.paidDate" class="success-date">
+                Paid on {{ formatDate(invoiceStore.currentInvoice.paidDate) }}
       </div>
-
-      <!-- Payments Table -->
-      <div v-if="paymentStore.payments.length > 0" class="table-container">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Method</th>
-              <th>Amount</th>
-              <th>Reference</th>
-              <th>Notes</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="payment in paymentStore.payments" :key="payment.id">
-              <td>{{ formatDate(payment.paymentDate) }}</td>
-              <td>{{ formatPaymentMethod(payment.paymentMethod) }}</td>
-              <td class="amount-cell">${{ payment.amount.toFixed(2) }}</td>
-              <td>{{ payment.reference || '-' }}</td>
-              <td>{{ payment.notes || '-' }}</td>
-            </tr>
-          </tbody>
-        </table>
-        <div class="payment-total">
-          Total Payments: ${{ paymentStore.totalPayments.toFixed(2) }}
         </div>
       </div>
-      <div v-else class="empty-state">
-        No payments recorded yet
-      </div>
+        </VCard>
+
+        <!-- Payments List -->
+        <div v-if="paymentStore.payments.length > 0" class="payments-list">
+          <VTimeline :items="paymentTimelineItems" />
+        </div>
+        <VEmptyState
+          v-else
+          title="No payments yet"
+          description="Record payments as they are received"
+          icon="document"
+        />
+      </VCard>
+
+    <!-- Form Actions -->
+    <div class="form-actions">
+        <VButton variant="ghost" @click="goBack">
+        Cancel
+        </VButton>
+        <div class="actions-right">
+          <VButton
+        v-if="!isEditMode"
+            variant="primary"
+            :loading="isLoading"
+        @click="handleSubmit"
+          >
+            Create Invoice
+          </VButton>
+          <VButton
+        v-if="isEditMode"
+            variant="primary"
+            :loading="isLoading"
+        @click="handleUpdate"
+          >
+            Update Invoice
+          </VButton>
+          <VButton
+        v-if="isEditMode && invoiceStore.currentInvoice?.status === 'Draft'"
+            variant="success"
+            :loading="isLoading"
+            :disabled="!invoiceStore.currentInvoice?.lineItems.length"
+        @click="handleMarkAsSent"
+          >
+            Mark as Sent
+          </VButton>
+          <VButton
+        v-if="isEditMode && (invoiceStore.currentInvoice?.status === 'Sent' || invoiceStore.currentInvoice?.status === 'Paid')"
+            variant="secondary"
+        @click="handleDownloadPDF"
+      >
+            <svg class="btn-icon" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
+            </svg>
+        Download PDF
+          </VButton>
+    </div>
+  </div>
     </div>
 
     <!-- Record Payment Modal -->
@@ -290,45 +397,7 @@
       @close="showPaymentModal = false"
       @success="handlePaymentSuccess"
     />
-
-    <!-- Form Actions -->
-    <div class="form-actions">
-      <router-link to="/invoices" class="btn-secondary">
-        Cancel
-      </router-link>
-      <button
-        v-if="!isEditMode"
-        @click="handleSubmit"
-        :disabled="invoiceStore.isLoading"
-        class="btn-primary"
-      >
-        {{ invoiceStore.isLoading ? 'Creating...' : 'Create Invoice' }}
-      </button>
-      <button
-        v-if="isEditMode"
-        @click="handleUpdate"
-        :disabled="invoiceStore.isLoading"
-        class="btn-primary"
-      >
-        {{ invoiceStore.isLoading ? 'Updating...' : 'Update Invoice' }}
-      </button>
-      <button
-        v-if="isEditMode && invoiceStore.currentInvoice?.status === 'Draft'"
-        @click="handleMarkAsSent"
-        :disabled="invoiceStore.isLoading || !invoiceStore.currentInvoice?.lineItems.length"
-        class="btn-success"
-      >
-        {{ invoiceStore.isLoading ? 'Generating PDF...' : 'Mark as Sent' }}
-      </button>
-      <button
-        v-if="isEditMode && (invoiceStore.currentInvoice?.status === 'Sent' || invoiceStore.currentInvoice?.status === 'Paid')"
-        @click="handleDownloadPDF"
-        class="btn-download"
-      >
-        Download PDF
-      </button>
-    </div>
-  </div>
+  </MainLayout>
 </template>
 
 <script setup lang="ts">
@@ -337,6 +406,20 @@ import { useRouter, useRoute } from 'vue-router';
 import { useInvoiceStore } from '../../stores/invoices';
 import { usePaymentStore } from '../../stores/payments';
 import { useCustomerStore } from '../../stores/customers';
+import { MainLayout } from '../../shared/layouts';
+import {
+  VButton,
+  VCard,
+  VInput,
+  VSelect,
+  VTextarea,
+  VTable,
+  VBreadcrumbs,
+  VDivider,
+  VEmptyState,
+  VTimeline,
+} from '../../shared/components';
+import { useToast, useBreakpoint } from '../../shared/composables';
 import RecordPaymentModal from '../../components/RecordPaymentModal.vue';
 import type { CreateInvoiceData, CreateLineItemData } from '../../shared/api/invoices';
 
@@ -345,12 +428,44 @@ const route = useRoute();
 const invoiceStore = useInvoiceStore();
 const paymentStore = usePaymentStore();
 const customerStore = useCustomerStore();
+const toast = useToast();
+const { isMobile } = useBreakpoint();
+
+const sidebarItems = [
+  { label: 'Dashboard', to: '/dashboard', icon: null },
+  { label: 'Invoices', to: '/invoices', icon: null },
+  { label: 'Customers', to: '/customers', icon: null },
+];
+
+const bottomNavItems = [
+  { label: 'Home', to: '/dashboard', icon: null },
+  { label: 'Invoices', to: '/invoices', icon: null },
+  { label: 'Customers', to: '/customers', icon: null },
+  { label: 'More', to: '/settings', icon: null },
+];
 
 const isEditMode = ref(false);
 const showAddLineItemForm = ref(false);
 const showPaymentModal = ref(false);
 const isLoadingCustomers = ref(false);
+const isLoading = computed(() => invoiceStore.isLoading);
 const customers = ref<any[]>([]);
+const errors = reactive<Record<string, string>>({});
+
+const breadcrumbs = computed(() => [
+  { label: 'Invoices', to: '/invoices' },
+  { label: isEditMode.value ? 'Edit Invoice' : 'Create Invoice' },
+]);
+
+const customerOptions = computed(() => {
+  if (isLoadingCustomers.value) {
+    return [{ value: '', label: 'Loading customers...' }];
+  }
+  return [
+    { value: '', label: 'Select a customer' },
+    ...customers.value.map(c => ({ value: c.id, label: `${c.name} (${c.email})` }))
+  ];
+});
 
 const form = reactive<CreateInvoiceData>({
   customerId: '',
@@ -368,9 +483,55 @@ const newLineItem = reactive<CreateLineItemData>({
   unitPrice: 0,
 });
 
-// Local line items for create mode (before invoice exists)
 const localLineItems = ref<Array<CreateLineItemData & { tempId: number }>>([]);
 let nextTempId = 1;
+
+const lineItemColumns = [
+  { key: 'description', label: 'Description' },
+  { key: 'quantity', label: 'Quantity' },
+  { key: 'unitPrice', label: 'Unit Price' },
+  { key: 'amount', label: 'Amount' },
+  { key: 'actions', label: '' },
+];
+
+const lineItemRows = computed(() => displayLineItems.value);
+
+const displayLineItems = computed(() => {
+  if (isEditMode.value && invoiceStore.currentInvoice) {
+    return invoiceStore.currentInvoice.lineItems;
+  }
+  return localLineItems.value;
+});
+
+const calculatedSubtotal = computed(() => {
+  if (isEditMode.value && invoiceStore.currentInvoice) {
+    return invoiceStore.currentInvoice.subtotal;
+  }
+  return displayLineItems.value.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+});
+
+const calculatedTax = computed(() => {
+  if (isEditMode.value && invoiceStore.currentInvoice) {
+    return invoiceStore.currentInvoice.taxAmount;
+  }
+  return calculatedSubtotal.value * (form.taxRate / 100);
+});
+
+const calculatedTotal = computed(() => {
+  if (isEditMode.value && invoiceStore.currentInvoice) {
+    return invoiceStore.currentInvoice.total;
+  }
+  return calculatedSubtotal.value + calculatedTax.value;
+});
+
+const paymentTimelineItems = computed(() => {
+  return paymentStore.payments.map(payment => ({
+    title: formatPaymentMethod(payment.paymentMethod),
+    description: payment.notes || payment.reference || 'Payment received',
+    date: formatDate(payment.paymentDate),
+    amount: `$${payment.amount.toFixed(2)}`,
+  }));
+});
 
 onMounted(async () => {
   // Fetch customers list
@@ -404,56 +565,27 @@ onMounted(async () => {
         await paymentStore.fetchPayments(id);
       }
     } catch (error) {
-      alert('Failed to load invoice');
+      toast.error('Failed to load invoice');
       router.push('/invoices');
     }
   }
 });
 
-// Computed properties
-const displayLineItems = computed(() => {
-  if (isEditMode.value && invoiceStore.currentInvoice) {
-    return invoiceStore.currentInvoice.lineItems;
-  }
-  return localLineItems.value;
-});
-
-const calculatedSubtotal = computed(() => {
-  if (isEditMode.value && invoiceStore.currentInvoice) {
-    return invoiceStore.currentInvoice.subtotal;
-  }
-  return displayLineItems.value.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
-});
-
-const calculatedTax = computed(() => {
-  if (isEditMode.value && invoiceStore.currentInvoice) {
-    return invoiceStore.currentInvoice.taxAmount;
-  }
-  return calculatedSubtotal.value * (form.taxRate / 100);
-});
-
-const calculatedTotal = computed(() => {
-  if (isEditMode.value && invoiceStore.currentInvoice) {
-    return invoiceStore.currentInvoice.total;
-  }
-  return calculatedSubtotal.value + calculatedTax.value;
-});
-
 const handleSubmit = async () => {
   if (!form.customerId) {
-    alert('Customer ID is required');
+    errors.customerId = 'Customer is required';
+    toast.error('Please select a customer');
     return;
   }
 
   if (localLineItems.value.length === 0) {
-    alert('Please add at least one line item');
+    toast.error('Please add at least one line item');
     return;
   }
 
   try {
     const invoice = await invoiceStore.createInvoice(form);
     
-    // Add all line items to the newly created invoice
     for (const item of localLineItems.value) {
       await invoiceStore.addLineItem(invoice.id, {
         description: item.description,
@@ -462,10 +594,10 @@ const handleSubmit = async () => {
       });
     }
     
-    alert('Invoice created successfully!');
+    toast.success('Invoice created successfully!');
     router.push(`/invoices/${invoice.id}/edit`);
   } catch (error) {
-    alert('Failed to create invoice');
+    toast.error('Failed to create invoice');
   }
 };
 
@@ -478,29 +610,27 @@ const handleUpdate = async () => {
       terms: form.terms,
       dueDate: form.dueDate,
     });
-    alert('Invoice updated successfully!');
+    toast.success('Invoice updated successfully!');
   } catch (error) {
-    alert('Failed to update invoice');
+    toast.error('Failed to update invoice');
   }
 };
 
 const handleAddLineItem = async () => {
   if (!newLineItem.description || newLineItem.quantity <= 0 || newLineItem.unitPrice < 0) {
-    alert('Please fill in all line item fields with valid values');
+    toast.error('Please fill in all line item fields with valid values');
     return;
   }
 
   if (isEditMode.value && invoiceStore.currentInvoice) {
-    // Edit mode: call API
     try {
       await invoiceStore.addLineItem(invoiceStore.currentInvoice.id, { ...newLineItem });
       cancelAddLineItem();
-      alert('Line item added successfully!');
+      toast.success('Line item added successfully!');
     } catch (error) {
-      alert('Failed to add line item');
+      toast.error('Failed to add line item');
     }
   } else {
-    // Create mode: add to local array
     localLineItems.value.push({
       ...newLineItem,
       tempId: nextTempId++,
@@ -510,18 +640,14 @@ const handleAddLineItem = async () => {
 };
 
 const handleRemoveLineItem = async (itemId: string | number) => {
-  if (!confirm('Remove this line item?')) return;
-
   if (isEditMode.value && invoiceStore.currentInvoice) {
-    // Edit mode: call API
     try {
       await invoiceStore.removeLineItem(invoiceStore.currentInvoice.id, itemId as string);
-      alert('Line item removed successfully!');
+      toast.success('Line item removed successfully!');
     } catch (error) {
-      alert('Failed to remove line item');
+      toast.error('Failed to remove line item');
     }
   } else {
-    // Create mode: remove from local array
     localLineItems.value = localLineItems.value.filter(item => item.tempId !== itemId);
   }
 };
@@ -536,13 +662,11 @@ const cancelAddLineItem = () => {
 const handleMarkAsSent = async () => {
   if (!invoiceStore.currentInvoice) return;
 
-  if (!confirm('Generate PDF and mark invoice as sent?')) return;
-
   try {
     await invoiceStore.markAsSent(invoiceStore.currentInvoice.id);
-    alert('Invoice marked as sent successfully!');
+    toast.success('Invoice marked as sent successfully!');
   } catch (error) {
-    alert('Failed to mark invoice as sent. Please try again.');
+    toast.error('Failed to mark invoice as sent');
   }
 };
 
@@ -551,21 +675,30 @@ const handleDownloadPDF = async () => {
 
   try {
     await invoiceStore.downloadPDF(invoiceStore.currentInvoice.id);
+    toast.success('PDF downloaded successfully');
   } catch (error) {
-    alert('Failed to download PDF. Please try again.');
+    toast.error('Failed to download PDF');
   }
 };
 
 const handlePaymentSuccess = async () => {
   if (!invoiceStore.currentInvoice) return;
 
-  // Refresh invoice and payments
   await invoiceStore.fetchInvoice(invoiceStore.currentInvoice.id);
   await paymentStore.fetchPayments(invoiceStore.currentInvoice.id);
+  toast.success('Payment recorded successfully!');
+};
+
+const goBack = () => {
+  router.push('/invoices');
 };
 
 const formatDate = (dateString: string): string => {
-  return new Date(dateString).toLocaleDateString();
+  return new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
 };
 
 const formatPaymentMethod = (method: string): string => {
@@ -581,76 +714,48 @@ const formatPaymentMethod = (method: string): string => {
 
 <style scoped>
 .invoice-form-page {
-  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-6);
   max-width: 1200px;
   margin: 0 auto;
 }
 
-.form-header {
+.breadcrumbs {
+  margin-bottom: var(--spacing-4);
+}
+
+.page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 2rem;
 }
 
-.form-header h1 {
+.page-title {
+  font-size: var(--font-size-display);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
   margin: 0;
-  font-size: 2rem;
-  color: #333;
-}
-
-.error-message {
-  padding: 1rem;
-  background: #fee;
-  border: 1px solid #fcc;
-  border-radius: 0.5rem;
-  color: #c00;
-  margin-bottom: 2rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: #c00;
-  cursor: pointer;
-  padding: 0;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.close-btn:hover {
-  opacity: 0.7;
 }
 
 .form-section-card {
-  background: white;
-  padding: 2rem;
-  border-radius: 0.5rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  margin-bottom: 2rem;
+  padding: var(--spacing-6);
 }
 
 .section-title {
-  margin: 0 0 1.5rem 0;
-  font-size: 1.5rem;
-  color: #333;
-  border-bottom: 2px solid #667eea;
-  padding-bottom: 0.5rem;
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-6) 0;
+  padding-bottom: var(--spacing-3);
+  border-bottom: 2px solid var(--color-venmo-blue);
 }
 
 .section-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
+  align-items: flex-start;
+  margin-bottom: var(--spacing-6);
 }
 
 .section-header .section-title {
@@ -662,131 +767,161 @@ const formatPaymentMethod = (method: string): string => {
 .form-row-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1.5rem;
-  margin-bottom: 1rem;
+  gap: var(--spacing-4);
+  margin-bottom: var(--spacing-4);
 }
 
-.form-group {
-  margin-bottom: 1.5rem;
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
 }
 
-.form-group label {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-weight: 500;
-  color: #333;
+.form-label {
+  font-size: var(--font-size-body-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
 }
 
 .required {
-  color: #c00;
+  color: var(--color-error);
 }
 
-.form-input {
-  width: 100%;
-  padding: 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 0.5rem;
-  font-size: 1rem;
-  transition: border-color 0.3s;
+.helper-text {
+  font-size: var(--font-size-caption);
+  color: var(--color-text-secondary);
+  margin-top: var(--spacing-1);
 }
 
-.form-input:focus {
-  outline: none;
-  border-color: #667eea;
+.error-helper {
+  color: var(--color-error);
 }
 
-.form-input:disabled {
-  background: #f5f5f5;
-  cursor: not-allowed;
-}
-
-.form-error {
-  margin-top: 0.5rem;
-  color: #c00;
-  font-size: 0.875rem;
-}
-
-.error-link {
+.helper-link {
+  color: var(--color-venmo-blue);
   text-decoration: underline;
-  color: #c00;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
-.error-link:hover {
+.helper-link:hover {
   opacity: 0.8;
 }
 
-/* Line Items Form */
+.btn-icon {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+
+.icon-md {
+  width: var(--icon-md);
+  height: var(--icon-md);
+}
+
+/* Line Items */
 .line-item-form {
-  background: #f8f9fa;
-  padding: 1.5rem;
-  border-radius: 0.5rem;
-  margin-bottom: 1.5rem;
+  padding: var(--spacing-4);
+  background-color: var(--color-background-secondary);
+  margin-bottom: var(--spacing-4);
 }
 
 .line-item-form-title {
-  margin: 0 0 1rem 0;
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #333;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-4) 0;
 }
 
 .line-item-grid {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr;
-  gap: 1rem;
-  margin-bottom: 1rem;
+  gap: var(--spacing-3);
+  margin-bottom: var(--spacing-3);
 }
 
 .form-actions-inline {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--spacing-2);
 }
 
-/* Tables */
-.table-container {
-  overflow-x: auto;
-  margin-top: 1rem;
+.line-items-list {
+  margin: var(--spacing-4) 0;
 }
 
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
+.line-items-mobile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
 }
 
-.data-table th {
-  background: #f8f9fa;
-  padding: 1rem;
-  text-align: left;
-  font-weight: 600;
-  border-bottom: 2px solid #dee2e6;
-  color: #333;
+.line-item-card {
+  padding: var(--spacing-4);
 }
 
-.data-table td {
-  padding: 1rem;
-  border-bottom: 1px solid #dee2e6;
+.line-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-2);
+}
+
+.item-number {
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-tertiary);
+}
+
+.line-item-description {
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-3);
+}
+
+.line-item-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--spacing-2);
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+}
+
+.detail-label {
+  font-size: var(--font-size-caption);
+  color: var(--color-text-secondary);
+}
+
+.detail-value {
+  font-size: var(--font-size-body-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+}
+
+.detail-value.amount {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-venmo-blue);
+}
+
+.description-cell {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
 }
 
 .amount-cell {
-  font-weight: 600;
-  color: #333;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-venmo-blue);
 }
 
-.empty-state {
-  text-align: center;
-  padding: 3rem 1rem;
-  color: #666;
-  font-size: 1rem;
-}
-
-/* Totals Section */
+/* Totals */
 .totals-section {
-  margin-top: 2rem;
+  margin-top: var(--spacing-6);
+  padding-top: var(--spacing-6);
+  border-top: 1px solid var(--color-border-gray);
   display: flex;
   justify-content: flex-end;
-  border-top: 2px solid #dee2e6;
-  padding-top: 1.5rem;
 }
 
 .totals-box {
@@ -796,151 +931,118 @@ const formatPaymentMethod = (method: string): string => {
 .total-row {
   display: flex;
   justify-content: space-between;
-  padding: 0.5rem 0;
-  font-size: 1rem;
+  padding: var(--spacing-2) 0;
+  font-size: var(--font-size-body);
+}
+
+.total-label {
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.total-value {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
 }
 
 .total-row-final {
-  border-top: 2px solid #333;
-  margin-top: 0.5rem;
-  padding-top: 1rem;
-  font-size: 1.25rem;
-  font-weight: bold;
+  margin-top: var(--spacing-3);
+  padding-top: var(--spacing-4);
+  font-size: var(--font-size-h3);
+  font-weight: var(--font-weight-bold);
 }
 
-/* Payment Section */
-.balance-display {
-  text-align: right;
+.total-row-final .total-value {
+  color: var(--color-venmo-blue);
+}
+
+/* Payment History */
+.balance-info {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-2);
+  margin-top: var(--spacing-2);
 }
 
 .balance-label {
-  font-size: 0.875rem;
-  color: #666;
-  margin-bottom: 0.25rem;
+  font-size: var(--font-size-body-sm);
+  color: var(--color-text-secondary);
 }
 
 .balance-amount {
-  font-size: 1.75rem;
-  font-weight: bold;
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-bold);
 }
 
 .balance-due {
-  color: #dc3545;
+  color: var(--color-error);
 }
 
 .balance-paid {
-  color: #28a745;
+  color: var(--color-success);
 }
 
-.payment-btn {
-  margin-bottom: 1.5rem;
+.success-banner {
+  padding: var(--spacing-4);
+  background-color: var(--color-success-light);
+  border: 1px solid var(--color-success);
+  margin-bottom: var(--spacing-4);
 }
 
-.success-message {
-  background: #d4edda;
-  border: 1px solid #c3e6cb;
-  color: #155724;
-  padding: 1rem;
-  border-radius: 0.5rem;
-  margin-bottom: 1.5rem;
-  font-weight: 600;
+.success-content {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
 }
 
 .success-icon {
-  font-weight: bold;
-  margin-right: 0.5rem;
+  width: var(--icon-lg);
+  height: var(--icon-lg);
+  color: var(--color-success);
+  flex-shrink: 0;
 }
 
-.paid-date {
-  margin-left: 0.5rem;
-  font-weight: normal;
+.success-title {
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-success-dark);
 }
 
-.payment-total {
-  text-align: right;
-  padding: 1rem;
-  font-size: 1.1rem;
-  font-weight: bold;
-  color: #333;
-  border-top: 2px solid #dee2e6;
+.success-date {
+  font-size: var(--font-size-body-sm);
+  color: var(--color-success-dark);
+  margin-top: var(--spacing-1);
 }
 
-/* Buttons */
-.btn-primary,
-.btn-secondary,
-.btn-success,
-.btn-delete,
-.btn-download,
-.btn-small {
-  padding: 0.75rem 1.5rem;
-  border: none;
-  border-radius: 0.5rem;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.3s;
-  text-decoration: none;
-  display: inline-block;
-  text-align: center;
-}
-
-.btn-small {
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-}
-
-.btn-primary {
-  background: #667eea;
-  color: white;
-}
-
-.btn-secondary {
-  background: #6c757d;
-  color: white;
-}
-
-.btn-success {
-  background: #28a745;
-  color: white;
-}
-
-.btn-delete {
-  background: #dc3545;
-  color: white;
-}
-
-.btn-download {
-  background: #6f42c1;
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled),
-.btn-secondary:hover:not(:disabled),
-.btn-success:hover:not(:disabled),
-.btn-delete:hover:not(:disabled),
-.btn-download:hover:not(:disabled) {
-  opacity: 0.9;
-}
-
-.btn-primary:disabled,
-.btn-secondary:disabled,
-.btn-success:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.payments-list {
+  margin-top: var(--spacing-4);
 }
 
 /* Form Actions */
 .form-actions {
   display: flex;
-  gap: 1rem;
-  justify-content: flex-end;
-  margin-top: 2rem;
-  padding-top: 2rem;
-  border-top: 1px solid #ddd;
+  justify-content: space-between;
+  gap: var(--spacing-3);
+  padding-top: var(--spacing-6);
+  border-top: 1px solid var(--color-border-gray);
 }
 
-/* Responsive */
+.actions-right {
+  display: flex;
+  gap: var(--spacing-2);
+}
+
 @media (max-width: 768px) {
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-3);
+  }
+
+  .page-title {
+    font-size: var(--font-size-h2);
+  }
+
   .form-row-grid {
     grid-template-columns: 1fr;
   }
@@ -952,21 +1054,26 @@ const formatPaymentMethod = (method: string): string => {
   .section-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 1rem;
+    gap: var(--spacing-3);
   }
 
-  .balance-display {
-    text-align: left;
+  .totals-section {
+    justify-content: stretch;
+  }
+
+  .totals-box {
+    width: 100%;
   }
 
   .form-actions {
     flex-direction: column;
   }
 
-  .btn-primary,
-  .btn-secondary,
-  .btn-success,
-  .btn-download {
+  .actions-right {
+    flex-direction: column;
+  }
+
+  .actions-right :deep(.v-button) {
     width: 100%;
   }
 }

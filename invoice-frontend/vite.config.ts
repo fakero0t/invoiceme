@@ -20,5 +20,14 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor': ['vue', 'vue-router', 'pinia'],
+          'axios': ['axios'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000,
   },
 });

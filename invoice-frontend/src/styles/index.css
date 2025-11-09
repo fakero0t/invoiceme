@@ -1,0 +1,24 @@
+/**
+ * Main Stylesheet
+ * Import order matters! Do not rearrange.
+ */
+
+/* 1. Design Tokens - Must be first to define CSS variables */
+@import './tokens.css';
+
+/* 2. Tailwind Base - Reset styles */
+@tailwind base;
+
+/* 3. Global Base Styles - Base HTML element styling */
+@import './global.css';
+
+/* 4. Global Utilities - Reusable utility classes */
+@import './utilities.css';
+
+/* 5. Global Animations - Animation utilities */
+@import './animations.css';
+
+/* 6. Tailwind Components and Utilities */
+@tailwind components;
+@tailwind utilities;
+

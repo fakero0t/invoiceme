@@ -6,7 +6,7 @@ const apiClient = axios.create({
     'Content-Type': 'application/json',
   },
   withCredentials: true, // Include cookies in requests
-  timeout: 5000, // 5 second timeout to prevent hanging
+  timeout: 10000, // 10 second timeout to prevent hanging
 });
 
 // Request interceptor for adding auth token
