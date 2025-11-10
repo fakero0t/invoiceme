@@ -1,14 +1,34 @@
 import { Request, Response } from 'express';
-import { refreshAccessToken } from '../../infrastructure/aws/cognitoClient';
+import { userRepository } from '../../infrastructure/database/UserRepository';
+import { jwtService } from '../../infrastructure/auth/jwtService';
 
 /**
- * POST /api/v1/auth/refresh
- * Refresh access token using refresh token
+ * @swagger
+ * /auth/refresh:
+ *   post:
+ *     summary: Refresh access token
+ *     tags: [Authentication]
+ *     security: []
+ *     description: Uses refresh token from cookie to generate new access token
+ *     responses:
+ *       200:
+ *         description: Token refreshed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 accessToken:
+ *                   type: string
+ *       401:
+ *         description: Invalid or expired refresh token
+ *       500:
+ *         description: Server error
  */
 export const refresh = async (req: Request, res: Response): Promise<void> => {
   try {
-    // Get refresh token from cookie or body
-    const refreshToken = req.cookies?.refreshToken || req.body.refreshToken;
+    // Extract refresh token from cookie
+    const refreshToken = req.cookies?.refreshToken;
 
     if (!refreshToken) {
       res.status(401).json({
@@ -18,36 +38,42 @@ export const refresh = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Request new access token from Cognito
-    let newAccessToken;
+    // Verify refresh token
+    let decoded;
     try {
-      newAccessToken = await refreshAccessToken(refreshToken);
+      decoded = jwtService.verifyRefreshToken(refreshToken);
     } catch (error: any) {
-      console.error('Token refresh error:', error);
-
-      if (
-        error.message === 'NotAuthorizedException' ||
-        error.message === 'InvalidParameterException'
-      ) {
-        // Clear invalid cookies
-        res.clearCookie('accessToken');
-        res.clearCookie('refreshToken');
-
-        res.status(401).json({
-          error: 'INVALID_REFRESH_TOKEN',
-          message: 'Invalid or expired refresh token',
-        });
-        return;
-      }
-
-      res.status(500).json({
-        error: 'REFRESH_ERROR',
-        message: 'Failed to refresh token',
+      console.error('Refresh token verification error:', error);
+      
+      // Clear invalid token
+      res.clearCookie('refreshToken');
+      
+      res.status(401).json({
+        error: error.message || 'INVALID_REFRESH_TOKEN',
+        message: 'Invalid or expired refresh token',
       });
       return;
     }
 
-    // Set new access token in httpOnly cookie
+    // Fetch user to ensure they still exist
+    const user = await userRepository().findById(decoded.sub);
+    
+    if (!user) {
+      res.clearCookie('refreshToken');
+      res.status(401).json({
+        error: 'USER_NOT_FOUND',
+        message: 'User not found',
+      });
+      return;
+    }
+
+    // Generate new access token
+    const newAccessToken = jwtService.generateAccessToken(user.id, user.email);
+
+    // Optional: Rotate refresh token for better security
+    const newRefreshToken = jwtService.generateRefreshToken(user.id);
+
+    // Set new tokens in cookies
     res.cookie('accessToken', newAccessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -55,15 +81,21 @@ export const refresh = async (req: Request, res: Response): Promise<void> => {
       maxAge: 3600000, // 1 hour
     });
 
+    res.cookie('refreshToken', newRefreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 2592000000, // 30 days
+    });
+
     res.json({
       accessToken: newAccessToken,
     });
   } catch (error) {
-    console.error('Refresh endpoint error:', error);
+    console.error('Refresh error:', error);
     res.status(500).json({
       error: 'INTERNAL_ERROR',
       message: 'An unexpected error occurred',
     });
   }
 };
-

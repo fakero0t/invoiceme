@@ -8,9 +8,9 @@ import {
 
 export const errorHandler = (
   error: Error,
-  req: Request,
+  _req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ): void => {
   // Log error for debugging
   console.error('Error:', error);

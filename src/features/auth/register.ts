@@ -1,11 +1,13 @@
 import { Request, Response } from 'express';
+import { v4 as uuidv4 } from 'uuid';
 import { User } from '../../domain/user/User';
 import { userRepository } from '../../infrastructure/database/UserRepository';
-import { signUpUser, loginUser, deleteUser } from '../../infrastructure/aws/cognitoClient';
+import { passwordService } from '../../infrastructure/auth/passwordService';
+import { jwtService } from '../../infrastructure/auth/jwtService';
 
 interface RegisterRequest {
   email: string;
-  password: string;
+  passwordHash: string; // Client-side SHA-256 hashed password
   name: string;
 }
 
@@ -24,19 +26,17 @@ interface RegisterRequest {
  *             type: object
  *             required:
  *               - email
- *               - password
+ *               - passwordHash
  *               - name
  *             properties:
  *               email:
  *                 type: string
  *                 format: email
  *                 example: user@example.com
- *               password:
+ *               passwordHash:
  *                 type: string
- *                 format: password
- *                 minLength: 8
- *                 example: SecurePass123
- *                 description: Must contain at least 8 characters with uppercase, lowercase, and number
+ *                 description: Client-side SHA-256 hashed password (hex string)
+ *                 example: 5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8
  *               name:
  *                 type: string
  *                 example: John Doe
@@ -71,13 +71,13 @@ interface RegisterRequest {
  */
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, password, name }: RegisterRequest = req.body;
+    const { email, passwordHash: clientPasswordHash, name }: RegisterRequest = req.body;
 
     // Validate input
-    if (!email || !password || !name) {
+    if (!email || !clientPasswordHash || !name) {
       res.status(400).json({
         error: 'INVALID_INPUT',
-        message: 'Email, password, and name are required',
+        message: 'Email, passwordHash, and name are required',
       });
       return;
     }
@@ -92,35 +92,11 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Validate password requirements
-    if (password.length < 8) {
+    // Validate passwordHash format (should be 64 character hex string from SHA-256)
+    if (!/^[a-f0-9]{64}$/i.test(clientPasswordHash)) {
       res.status(400).json({
-        error: 'INVALID_PASSWORD',
-        message: 'Password must be at least 8 characters',
-      });
-      return;
-    }
-
-    if (!/[A-Z]/.test(password)) {
-      res.status(400).json({
-        error: 'INVALID_PASSWORD',
-        message: 'Password must contain at least one uppercase letter',
-      });
-      return;
-    }
-
-    if (!/[a-z]/.test(password)) {
-      res.status(400).json({
-        error: 'INVALID_PASSWORD',
-        message: 'Password must contain at least one lowercase letter',
-      });
-      return;
-    }
-
-    if (!/[0-9]/.test(password)) {
-      res.status(400).json({
-        error: 'INVALID_PASSWORD',
-        message: 'Password must contain at least one number',
+        error: 'INVALID_PASSWORD_HASH',
+        message: 'Invalid password hash format',
       });
       return;
     }
@@ -135,45 +111,26 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Create user in Cognito
-    let cognitoResult;
-    try {
-      cognitoResult = await signUpUser({ email, password, name });
-    } catch (error: any) {
-      console.error('❌ COGNITO SIGNUP ERROR:');
-      console.error('Error name:', error.name);
-      console.error('Error message:', error.message);
-      console.error('Full error:', JSON.stringify(error, null, 2));
-      
-      if (error.message === 'UsernameExistsException') {
-        res.status(409).json({
-          error: 'DUPLICATE_EMAIL',
-          message: 'User with this email already exists',
-        });
-        return;
-      }
+    // Apply bcrypt to the client-side hash for storage
+    // This creates a double-hashed password: bcrypt(SHA256(plainPassword))
+    const passwordHash = await passwordService.hashPassword(clientPasswordHash);
 
-      res.status(500).json({
-        error: 'COGNITO_ERROR',
-        message: 'Failed to create user account',
-      });
-      return;
-    }
+    // Generate UUID for new user
+    const userId = uuidv4();
 
     // Create user domain entity
-    const user = User.create({
-      id: cognitoResult.userSub,
+    const user = User.createWithPassword({
+      id: userId,
       email,
       name,
+      passwordHash,
     });
 
     // Save to database
     try {
       await userRepository().save(user);
     } catch (error: any) {
-      // Cleanup: Delete from Cognito if database fails
-      console.error('Database save error, cleaning up Cognito user:', error);
-      await deleteUser(email);
+      console.error('Database save error:', error);
 
       if (error.message === 'DUPLICATE_EMAIL') {
         res.status(409).json({
@@ -190,38 +147,30 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Auto-login after registration
-    try {
-      const loginResult = await loginUser({ email, password });
+    // Generate JWT tokens
+    const accessToken = jwtService.generateAccessToken(userId, email);
+    const refreshToken = jwtService.generateRefreshToken(userId);
 
-      // Set httpOnly cookies
-      res.cookie('accessToken', loginResult.accessToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 3600000, // 1 hour
-      });
+    // Set httpOnly cookies
+    res.cookie('accessToken', accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 3600000, // 1 hour
+    });
 
-      res.cookie('refreshToken', loginResult.refreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 2592000000, // 30 days
-      });
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 2592000000, // 30 days
+    });
 
-      res.status(201).json({
-        user: user.toJSON(),
-        accessToken: loginResult.accessToken,
-        refreshToken: loginResult.refreshToken,
-      });
-    } catch (loginError) {
-      // User created but login failed - still return success
-      console.error('Auto-login failed after registration:', loginError);
-      res.status(201).json({
-        user: user.toJSON(),
-        message: 'User created successfully. Please login.',
-      });
-    }
+    res.status(201).json({
+      user: user.toJSON(),
+      accessToken,
+      refreshToken,
+    });
   } catch (error) {
     console.error('Register error:', error);
     res.status(500).json({
@@ -230,4 +179,3 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     });
   }
 };
-

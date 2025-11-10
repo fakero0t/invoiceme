@@ -68,14 +68,14 @@ export class PostgreSQLInvoiceRepository implements IInvoiceRepository {
       
       // 2. Delete existing line items
       await client.query(
-        'DELETE FROM invoice_line_items WHERE invoice_id = $1',
+        'DELETE FROM line_items WHERE invoice_id = $1',
         [invoice.id]
       );
       
       // 3. Insert current line items
       for (const item of invoice.lineItems) {
         const lineItemQuery = `
-          INSERT INTO invoice_line_items (
+          INSERT INTO line_items (
             id, invoice_id, description, quantity, unit_price, amount, created_at
           )
           VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -118,7 +118,7 @@ export class PostgreSQLInvoiceRepository implements IInvoiceRepository {
     
     // Load line items
     const lineItemsQuery = `
-      SELECT * FROM invoice_line_items
+      SELECT * FROM line_items
       WHERE invoice_id = $1
       ORDER BY created_at ASC
     `;
@@ -159,17 +159,32 @@ export class PostgreSQLInvoiceRepository implements IInvoiceRepository {
     
     const result = await client.query(query, params);
     
-    // Load line items for each invoice
+    // Load all line items for these invoices in ONE query (prevents N+1)
+    const invoiceIds = result.rows.map(row => row.id);
+    let lineItemsByInvoiceId: Map<string, any[]> = new Map();
+    
+    if (invoiceIds.length > 0) {
+      const lineItemsQuery = `
+        SELECT * FROM line_items
+        WHERE invoice_id = ANY($1)
+        ORDER BY invoice_id, created_at ASC
+      `;
+      const lineItemsResult = await client.query(lineItemsQuery, [invoiceIds]);
+      
+      // Group line items by invoice_id
+      for (const lineItem of lineItemsResult.rows) {
+        if (!lineItemsByInvoiceId.has(lineItem.invoice_id)) {
+          lineItemsByInvoiceId.set(lineItem.invoice_id, []);
+        }
+        lineItemsByInvoiceId.get(lineItem.invoice_id)!.push(lineItem);
+      }
+    }
+    
+    // Build invoices with their line items
     const invoices: Invoice[] = [];
     for (const row of result.rows) {
-      const lineItemsQuery = `
-        SELECT * FROM invoice_line_items
-        WHERE invoice_id = $1
-        ORDER BY created_at ASC
-      `;
-      
-      const lineItemsResult = await client.query(lineItemsQuery, [row.id]);
-      invoices.push(this.mapRowToInvoice(row, lineItemsResult.rows));
+      const lineItems = lineItemsByInvoiceId.get(row.id) || [];
+      invoices.push(this.mapRowToInvoice(row, lineItems));
     }
     
     return invoices;

@@ -201,14 +201,32 @@ export class InvoiceRepository {
         offset,
       ]);
 
-      // Load line items for each invoice
+      // Load all line items for these invoices in ONE query (prevents N+1)
+      const invoiceIds = dataResult.rows.map(row => row.id);
+      let lineItemsByInvoiceId: Map<string, any[]> = new Map();
+      
+      if (invoiceIds.length > 0) {
+        const lineItemsQuery = `
+          SELECT * FROM line_items
+          WHERE invoice_id = ANY($1)
+          ORDER BY invoice_id, created_at ASC
+        `;
+        const lineItemsResult = await this.db.query(lineItemsQuery, [invoiceIds]);
+        
+        // Group line items by invoice_id
+        for (const lineItem of lineItemsResult.rows) {
+          if (!lineItemsByInvoiceId.has(lineItem.invoice_id)) {
+            lineItemsByInvoiceId.set(lineItem.invoice_id, []);
+          }
+          lineItemsByInvoiceId.get(lineItem.invoice_id)!.push(lineItem);
+        }
+      }
+
+      // Build invoices with their line items
       const invoices: Invoice[] = [];
       for (const row of dataResult.rows) {
-        const lineItemsResult = await this.db.query(
-          'SELECT * FROM line_items WHERE invoice_id = $1 ORDER BY created_at ASC',
-          [row.id]
-        );
-        invoices.push(this.toDomain(row, lineItemsResult.rows));
+        const lineItems = lineItemsByInvoiceId.get(row.id) || [];
+        invoices.push(this.toDomain(row, lineItems));
       }
 
       const totalPages = Math.ceil(totalCount / validPageSize);

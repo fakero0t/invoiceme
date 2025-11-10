@@ -1,30 +1,22 @@
 import { Request, Response } from 'express';
-import { signOutUser } from '../../infrastructure/aws/cognitoClient';
 
 /**
- * POST /api/v1/auth/logout
- * Log out user and invalidate tokens
+ * @swagger
+ * /auth/logout:
+ *   post:
+ *     summary: Logout user
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Logout successful
+ *       500:
+ *         description: Server error
  */
-export const logout = async (req: Request, res: Response): Promise<void> => {
+export const logout = async (_req: Request, res: Response): Promise<void> => {
   try {
-    // Get access token from cookie or header
-    let accessToken = req.cookies?.accessToken;
-    
-    if (!accessToken) {
-      accessToken = req.headers.authorization?.replace('Bearer ', '');
-    }
-
-    // Attempt to sign out from Cognito if we have a token
-    if (accessToken) {
-      try {
-        await signOutUser(accessToken);
-      } catch (error) {
-        // Continue even if Cognito signout fails
-        console.error('Cognito signout error:', error);
-      }
-    }
-
-    // Clear cookies
+    // Clear httpOnly cookies
     res.clearCookie('accessToken', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -42,14 +34,9 @@ export const logout = async (req: Request, res: Response): Promise<void> => {
     });
   } catch (error) {
     console.error('Logout error:', error);
-    // Still clear cookies even if there's an error
-    res.clearCookie('accessToken');
-    res.clearCookie('refreshToken');
-    
     res.status(500).json({
-      error: 'LOGOUT_ERROR',
-      message: 'An error occurred during logout',
+      error: 'INTERNAL_ERROR',
+      message: 'An unexpected error occurred',
     });
   }
 };
-

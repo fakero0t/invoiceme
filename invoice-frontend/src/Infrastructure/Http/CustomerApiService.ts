@@ -50,9 +50,17 @@ export class CustomerApiService {
     return response.data.data;
   }
   
-  static async listCustomers(): Promise<CustomerDTO[]> {
-    const response = await apiClient.get(this.BASE_URL);
-    return response.data.data;
+  static async listCustomers(page: number = 1, pageSize: number = 25, search?: string): Promise<{
+    items: CustomerDTO[];
+    totalCount: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+  }> {
+    const response = await apiClient.get(this.BASE_URL, {
+      params: { page, pageSize, search }
+    });
+    return response.data;
   }
 }
 

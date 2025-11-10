@@ -135,7 +135,7 @@ textarea::placeholder {
 
 /* Selection */
 ::selection {
-  background-color: var(--color-venmo-blue-200);
+  background-color: #E5E7EB;
   color: var(--color-text-primary);
 }
 

@@ -111,7 +111,7 @@ const helperTextId = computed(() => {
 
 .v-input.has-error:focus {
   border-color: var(--color-error);
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.3);
+  box-shadow: 0 0 0 3px rgba(38, 38, 38, 0.3);
 }
 
 /* Success state */
@@ -121,7 +121,7 @@ const helperTextId = computed(() => {
 
 .v-input.has-success:focus {
   border-color: var(--color-success);
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.3);
+  box-shadow: 0 0 0 3px rgba(64, 64, 64, 0.3);
 }
 
 /* Disabled state */

@@ -3,7 +3,7 @@ import { createPinia } from 'pinia';
 import App from './App.vue';
 import router from './router';
 
-console.log('🚀 Starting Invoice MVP Frontend...');
+console.log('🚀 Starting invoiceme Frontend...');
 console.log('🔓 Auth disabled - Development Mode');
 
 const app = createApp(App);

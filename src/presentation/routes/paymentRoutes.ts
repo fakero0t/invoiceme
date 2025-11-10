@@ -21,10 +21,8 @@ export function createPaymentRoutes(container: DependencyContainer): Router {
         notes: req.body.notes,
       });
       
-      res.status(201).json({
-        success: true,
-        data: { id: paymentId }
-      });
+      // Return payment id directly
+      res.status(201).json({ id: paymentId });
     } catch (error) {
       next(error);
     }
@@ -39,26 +37,22 @@ export function createPaymentRoutes(container: DependencyContainer): Router {
         userId: req.user!.id,
       });
       
-      res.json({
-        success: true,
-        data: payment
-      });
+      // Return payment directly (not wrapped) to match frontend expectations
+      res.json(payment);
     } catch (error) {
       next(error);
     }
   });
   
   // GET /payments - List all payments for an invoice
-  router.get('/', async (req, res, next) => {
+  router.get('/', async (req, res, next): Promise<void> => {
     try {
       if (!req.query.invoiceId) {
-        return res.status(400).json({
-          success: false,
-          error: {
-            code: 'MISSING_INVOICE_ID',
-            message: 'invoiceId query parameter is required'
-          }
+        res.status(400).json({
+          error: 'MISSING_INVOICE_ID',
+          message: 'invoiceId query parameter is required'
         });
+        return;
       }
       
       const handler = container.resolve(ListPaymentsQueryHandler);
@@ -67,10 +61,8 @@ export function createPaymentRoutes(container: DependencyContainer): Router {
         userId: req.user!.id,
       });
       
-      res.json({
-        success: true,
-        data: payments
-      });
+      // Return payments array directly to match frontend expectations
+      res.json(payments);
     } catch (error) {
       next(error);
     }

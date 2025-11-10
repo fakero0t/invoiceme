@@ -1,10 +1,11 @@
 import { Request, Response } from 'express';
 import { userRepository } from '../../infrastructure/database/UserRepository';
-import { loginUser } from '../../infrastructure/aws/cognitoClient';
+import { passwordService } from '../../infrastructure/auth/passwordService';
+import { jwtService } from '../../infrastructure/auth/jwtService';
 
 interface LoginRequest {
   email: string;
-  password: string;
+  passwordHash: string; // Client-side SHA-256 hashed password
 }
 
 /**
@@ -22,16 +23,16 @@ interface LoginRequest {
  *             type: object
  *             required:
  *               - email
- *               - password
+ *               - passwordHash
  *             properties:
  *               email:
  *                 type: string
  *                 format: email
  *                 example: user@example.com
- *               password:
+ *               passwordHash:
  *                 type: string
- *                 format: password
- *                 example: SecurePass123
+ *                 description: Client-side SHA-256 hashed password (hex string)
+ *                 example: 5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8
  *     responses:
  *       200:
  *         description: Login successful
@@ -57,35 +58,41 @@ interface LoginRequest {
  */
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, password }: LoginRequest = req.body;
+    const { email, passwordHash: clientPasswordHash }: LoginRequest = req.body;
 
     // Validate input
-    if (!email || !password) {
+    if (!email || !clientPasswordHash) {
       res.status(400).json({
         error: 'INVALID_INPUT',
-        message: 'Email and password are required',
+        message: 'Email and passwordHash are required',
       });
       return;
     }
 
-    // Authenticate with Cognito
-    let authResult;
-    try {
-      authResult = await loginUser({ email, password });
-    } catch (error: any) {
-      console.error('Cognito login error:', error);
+    // Validate passwordHash format (should be 64 character hex string from SHA-256)
+    if (!/^[a-f0-9]{64}$/i.test(clientPasswordHash)) {
+      res.status(400).json({
+        error: 'INVALID_PASSWORD_HASH',
+        message: 'Invalid password hash format',
+      });
+      return;
+    }
 
-      if (
-        error.message === 'NotAuthorizedException' ||
-        error.message === 'UserNotFoundException'
-      ) {
-        res.status(401).json({
-          error: 'INVALID_CREDENTIALS',
-          message: 'Invalid email or password',
-        });
-        return;
-      }
+    // Fetch user with password hash
+    const user = await userRepository().findByEmailWithPassword(email);
+    
+    if (!user) {
+      res.status(401).json({
+        error: 'INVALID_CREDENTIALS',
+        message: 'Invalid email or password',
+      });
+      return;
+    }
 
+    // Get stored password hash (bcrypt hash of client-side SHA-256 hash)
+    const storedPasswordHash = user.getPasswordHash();
+    if (!storedPasswordHash) {
+      console.error('User found but no password hash:', email);
       res.status(500).json({
         error: 'AUTHENTICATION_ERROR',
         message: 'Failed to authenticate',
@@ -93,26 +100,30 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Fetch user data from database
-    const user = await userRepository().findByEmail(email);
+    // Verify password: compare client hash with stored bcrypt(clientHash)
+    const isPasswordValid = await passwordService.comparePassword(clientPasswordHash, storedPasswordHash);
     
-    if (!user) {
-      res.status(404).json({
-        error: 'USER_NOT_FOUND',
-        message: 'User record not found',
+    if (!isPasswordValid) {
+      res.status(401).json({
+        error: 'INVALID_CREDENTIALS',
+        message: 'Invalid email or password',
       });
       return;
     }
 
+    // Generate JWT tokens
+    const accessToken = jwtService.generateAccessToken(user.id, user.email);
+    const refreshToken = jwtService.generateRefreshToken(user.id);
+
     // Set httpOnly cookies for token storage
-    res.cookie('accessToken', authResult.accessToken, {
+    res.cookie('accessToken', accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
       maxAge: 3600000, // 1 hour
     });
 
-    res.cookie('refreshToken', authResult.refreshToken, {
+    res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
@@ -121,9 +132,9 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     res.json({
       user: user.toJSON(),
-      accessToken: authResult.accessToken,
-      refreshToken: authResult.refreshToken,
-      expiresIn: authResult.expiresIn,
+      accessToken,
+      refreshToken,
+      expiresIn: 3600,
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -133,4 +144,3 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     });
   }
 };
-

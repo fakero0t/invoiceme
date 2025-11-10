@@ -72,7 +72,7 @@
             :type="showPassword ? 'text' : 'password'"
             placeholder="At least 8 characters"
             :disabled="isLoading"
-            @blur="validatePassword"
+            @blur="validatePasswordField"
           />
           
           <!-- Password Strength Indicator -->
@@ -103,10 +103,6 @@
           />
         </div>
 
-        <VCheckbox v-model="agreeToTerms" :disabled="isLoading">
-          I agree to the <a href="#" class="link-primary">Terms of Service</a> and <a href="#" class="link-primary">Privacy Policy</a>
-        </VCheckbox>
-
         <VButton
           type="submit"
           variant="primary"
@@ -132,8 +128,9 @@ import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../../stores/auth';
 import { AuthLayout } from '../../shared/layouts';
-import { VInput, VButton, VCard, VCheckbox, VProgress } from '../../shared/components';
+import { VInput, VButton, VCard, VProgress } from '../../shared/components';
 import { useToast } from '../../shared/composables';
+import { validatePassword } from '../../shared/utils/crypto';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -146,7 +143,6 @@ const emailConfirm = ref('');
 const password = ref('');
 const passwordConfirm = ref('');
 const showPassword = ref(false);
-const agreeToTerms = ref(false);
 const isLoading = ref(false);
 const errorMessage = ref('');
 
@@ -186,13 +182,15 @@ const canSubmit = computed(() => {
     password.value &&
     passwordConfirm.value &&
     password.value === passwordConfirm.value &&
-    passwordStrength.value.score >= 1 &&
-    agreeToTerms.value;
+    passwordStrength.value.score >= 1;
 });
 
-const validatePassword = () => {
-  if (password.value.length < 8) {
-    errorMessage.value = 'Password must be at least 8 characters';
+const validatePasswordField = () => {
+  const validation = validatePassword(password.value);
+  if (!validation.isValid) {
+    errorMessage.value = validation.errors.join('. ');
+  } else {
+    errorMessage.value = '';
   }
 };
 
@@ -204,6 +202,14 @@ const handleSignup = async () => {
   if (email.value !== emailConfirm.value) {
     errorMessage.value = 'Email addresses do not match';
     emailConfirmError.value = true;
+    isLoading.value = false;
+    return;
+  }
+
+  // Validate password requirements
+  const passwordValidation = validatePassword(password.value);
+  if (!passwordValidation.isValid) {
+    errorMessage.value = passwordValidation.errors.join('. ');
     isLoading.value = false;
     return;
   }
@@ -337,7 +343,7 @@ const handleSignup = async () => {
 }
 
 .strength-medium :deep(.v-progress-bar) {
-  background: linear-gradient(135deg, var(--color-warning) 0%, #F59E0B 100%);
+  background: linear-gradient(135deg, var(--color-warning) 0%, #737373 100%);
 }
 
 .strength-strong {

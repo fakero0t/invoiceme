@@ -1,5 +1,6 @@
 const { Pool } = require('pg');
-const { randomUUID } = require('crypto');
+const { randomUUID, createHash } = require('crypto');
+const bcrypt = require('bcrypt');
 require('dotenv').config();
 
 const pool = new Pool({
@@ -8,6 +9,7 @@ const pool = new Pool({
 
 const TEST_USER_EMAIL = 'test@test.com';
 const TEST_USER_NAME = 'Test User';
+const TEST_USER_PASSWORD = 'password'; // Plain password for testing
 
 // Test customers data
 const customers = [
@@ -112,14 +114,31 @@ async function seedTestData() {
     if (userResult.rows.length === 0) {
       // Use fixed UUID to match auth middleware mock user
       userId = '00000000-0000-0000-0000-000000000001';
+      
+      // Hash password: SHA-256 client-side, then bcrypt server-side
+      const clientHash = createHash('sha256').update(TEST_USER_PASSWORD).digest('hex');
+      const passwordHash = await bcrypt.hash(clientHash, 10);
+      
       await client.query(
-        'INSERT INTO users (id, email, name, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW())',
-        [userId, TEST_USER_EMAIL, TEST_USER_NAME]
+        'INSERT INTO users (id, email, name, password_hash, created_at, updated_at) VALUES ($1, $2, $3, $4, NOW(), NOW())',
+        [userId, TEST_USER_EMAIL, TEST_USER_NAME, passwordHash]
       );
       console.log(`✅ Created test user: ${TEST_USER_EMAIL} (${userId})`);
+      console.log(`   Password: ${TEST_USER_PASSWORD}`);
     } else {
       userId = userResult.rows[0].id;
       console.log(`✅ Found existing test user: ${TEST_USER_EMAIL} (${userId})`);
+      
+      // Update password if it doesn't exist
+      if (!userResult.rows[0].password_hash) {
+        const clientHash = createHash('sha256').update(TEST_USER_PASSWORD).digest('hex');
+        const passwordHash = await bcrypt.hash(clientHash, 10);
+        await client.query(
+          'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2',
+          [passwordHash, userId]
+        );
+        console.log(`   Updated password to: ${TEST_USER_PASSWORD}`);
+      }
     }
 
     // Check if data already exists

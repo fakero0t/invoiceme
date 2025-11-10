@@ -18,6 +18,7 @@ export function createInvoiceRoutes(container: DependencyContainer): Router {
   // POST /invoices - Create new invoice
   router.post('/', async (req, res, next) => {
     try {
+      console.log('POST /invoices - Request received:', req.body);
       const handler = container.resolve(CreateInvoiceCommandHandler);
       const invoiceId = await handler.handle({
         userId: req.user!.id,
@@ -29,12 +30,12 @@ export function createInvoiceRoutes(container: DependencyContainer): Router {
         issueDate: new Date(req.body.issueDate),
         dueDate: new Date(req.body.dueDate),
       });
+      console.log('Invoice created successfully, id:', invoiceId);
       
-      res.status(201).json({
-        success: true,
-        data: { id: invoiceId }
-      });
+      // Return invoice object directly to match frontend expectations
+      res.status(201).json({ id: invoiceId });
     } catch (error) {
+      console.error('POST /invoices - Error:', error);
       next(error);
     }
   });
@@ -51,10 +52,8 @@ export function createInvoiceRoutes(container: DependencyContainer): Router {
         dueDate: req.body.dueDate ? new Date(req.body.dueDate) : undefined,
       });
       
-      res.json({
-        success: true,
-        data: { id: req.params.id }
-      });
+      // Return success response directly
+      res.json({ id: req.params.id });
     } catch (error) {
       next(error);
     }
@@ -69,10 +68,8 @@ export function createInvoiceRoutes(container: DependencyContainer): Router {
         userId: req.user!.id,
       });
       
-      res.json({
-        success: true,
-        data: { id: req.params.id }
-      });
+      // Return success response directly
+      res.json({ id: req.params.id });
     } catch (error) {
       next(error);
     }
@@ -87,10 +84,8 @@ export function createInvoiceRoutes(container: DependencyContainer): Router {
         userId: req.user!.id,
       });
       
-      res.json({
-        success: true,
-        data: { id: req.params.id }
-      });
+      // Return success response directly
+      res.json({ id: req.params.id });
     } catch (error) {
       next(error);
     }
@@ -99,6 +94,7 @@ export function createInvoiceRoutes(container: DependencyContainer): Router {
   // POST /invoices/:id/line-items - Add line item
   router.post('/:id/line-items', async (req, res, next) => {
     try {
+      console.log('POST /invoices/:id/line-items - Request:', req.params.id, req.body);
       const handler = container.resolve(AddLineItemCommandHandler);
       const lineItemId = await handler.handle({
         invoiceId: req.params.id,
@@ -107,12 +103,12 @@ export function createInvoiceRoutes(container: DependencyContainer): Router {
         quantity: req.body.quantity,
         unitPrice: req.body.unitPrice,
       });
+      console.log('Line item added successfully, id:', lineItemId);
       
-      res.status(201).json({
-        success: true,
-        data: { id: lineItemId }
-      });
+      // Return line item id directly
+      res.status(201).json({ id: lineItemId });
     } catch (error) {
+      console.error('POST /invoices/:id/line-items - Error:', error);
       next(error);
     }
   });
@@ -130,10 +126,8 @@ export function createInvoiceRoutes(container: DependencyContainer): Router {
         unitPrice: req.body.unitPrice,
       });
       
-      res.json({
-        success: true,
-        data: { id: req.params.lineItemId }
-      });
+      // Return success response directly
+      res.json({ id: req.params.lineItemId });
     } catch (error) {
       next(error);
     }
@@ -149,10 +143,8 @@ export function createInvoiceRoutes(container: DependencyContainer): Router {
         userId: req.user!.id,
       });
       
-      res.json({
-        success: true,
-        data: { id: req.params.lineItemId }
-      });
+      // Return success response directly
+      res.json({ id: req.params.lineItemId });
     } catch (error) {
       next(error);
     }
@@ -167,10 +159,8 @@ export function createInvoiceRoutes(container: DependencyContainer): Router {
         userId: req.user!.id,
       });
       
-      res.json({
-        success: true,
-        data: { pdfKey }
-      });
+      // Return PDF key directly
+      res.json({ pdfKey });
     } catch (error) {
       next(error);
     }
@@ -185,10 +175,8 @@ export function createInvoiceRoutes(container: DependencyContainer): Router {
         userId: req.user!.id,
       });
       
-      res.json({
-        success: true,
-        data: invoice
-      });
+      // Return invoice directly (not wrapped) to match frontend expectations
+      res.json(invoice);
     } catch (error) {
       next(error);
     }
@@ -198,15 +186,30 @@ export function createInvoiceRoutes(container: DependencyContainer): Router {
   router.get('/', async (req, res, next) => {
     try {
       const handler = container.resolve(ListInvoicesQueryHandler);
+      
+      // Parse pagination parameters
+      const page = parseInt(req.query.page as string) || 1;
+      const pageSize = parseInt(req.query.pageSize as string) || 25;
+      
       const invoices = await handler.handle({
         userId: req.user!.id,
         status: req.query.status as string | undefined,
         search: req.query.search as string | undefined,
       });
       
+      // Return paginated format expected by frontend
+      const totalCount = invoices.length;
+      const totalPages = Math.ceil(totalCount / pageSize);
+      const startIndex = (page - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+      const paginatedItems = invoices.slice(startIndex, endIndex);
+      
       res.json({
-        success: true,
-        data: invoices
+        items: paginatedItems,
+        totalCount: totalCount,
+        page: page,
+        pageSize: pageSize,
+        totalPages: totalPages
       });
     } catch (error) {
       next(error);

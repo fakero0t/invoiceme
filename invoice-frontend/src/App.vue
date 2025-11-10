@@ -9,12 +9,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { useAuthStore } from './stores/auth';
 
 const router = useRouter();
+const authStore = useAuthStore();
 const transitionName = ref('fade');
 const previousPath = ref('');
+
+// Initialize auth state on app mount
+onMounted(async () => {
+  // Restore session from localStorage if available
+  if (localStorage.getItem('accessToken')) {
+    try {
+      await authStore.initializeAuth();
+    } catch (error) {
+      console.error('Failed to restore session:', error);
+    }
+  }
+});
 
 // Track navigation direction for better transitions
 watch(

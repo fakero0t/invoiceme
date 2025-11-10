@@ -29,7 +29,7 @@ export const useInvoiceStore = defineStore('invoices', () => {
   const totalPages = ref(0);
 
   // Getters
-  const hasInvoices = computed(() => invoices.value.length > 0);
+  const hasInvoices = computed(() => invoices.value && invoices.value.length > 0);
 
   // Actions
   const fetchInvoices = async (page: number = 1, status?: string, search?: string) => {
@@ -38,14 +38,17 @@ export const useInvoiceStore = defineStore('invoices', () => {
 
     try {
       const result: PagedResult<Invoice> = await apiListInvoices(page, pageSize.value, status, search);
-      invoices.value = result.items;
-      totalCount.value = result.totalCount;
-      currentPage.value = result.page;
-      pageSize.value = result.pageSize;
-      totalPages.value = result.totalPages;
+      invoices.value = result.items || [];
+      totalCount.value = result.totalCount || 0;
+      currentPage.value = result.page || page;
+      pageSize.value = result.pageSize || pageSize.value;
+      totalPages.value = result.totalPages || 0;
       return result;
     } catch (err: any) {
-      error.value = err.response?.data?.message || 'Failed to fetch invoices';
+      console.error('Failed to fetch invoices:', err);
+      error.value = err.response?.data?.message || err.message || 'Failed to fetch invoices';
+      invoices.value = []; // Clear invoices on error
+      totalCount.value = 0;
       throw err;
     } finally {
       isLoading.value = false;

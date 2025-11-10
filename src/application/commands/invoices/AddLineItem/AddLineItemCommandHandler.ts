@@ -1,6 +1,6 @@
 import { inject, injectable } from 'tsyringe';
 import { randomUUID } from 'crypto';
-import { Pool, PoolClient } from 'pg';
+import { Pool } from 'pg';
 import { AddLineItemCommand } from './AddLineItemCommand';
 import { IInvoiceRepository } from '../../../../domain/invoice/IInvoiceRepository';
 import { IEventBus } from '../../../../domain/shared/IEventBus';

@@ -116,6 +116,18 @@ app.use(cookieParser());
 // Rate limiting middleware
 app.use(getLimiter());
 
+// Request timing middleware for performance monitoring
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    if (duration > 100) { // Log slow requests (>100ms)
+      console.log(`⏱️  ${req.method} ${req.path} - ${duration}ms`);
+    }
+  });
+  next();
+});
+
 // Health check endpoint
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -145,9 +157,10 @@ console.log('✅ Routes registered successfully');
 app.use(errorHandler);
 
 // Start server
+let server: any;
 try {
   console.log('🚀 Starting server...');
-  const server = app.listen(PORT, () => {
+  server = app.listen(PORT, () => {
     console.log(`✅ Server running on http://localhost:${PORT}`);
     console.log(`📝 Environment: ${config.NODE_ENV}`);
     console.log(`📚 API Docs available at http://localhost:${PORT}/api/docs`);
@@ -170,10 +183,12 @@ try {
 const gracefulShutdown = () => {
   console.log('🛑 Received shutdown signal, closing server gracefully...');
   
-  server.close(() => {
-    console.log('✅ Server closed successfully');
-    process.exit(0);
-  });
+  if (server) {
+    server.close(() => {
+      console.log('✅ Server closed successfully');
+      process.exit(0);
+    });
+  }
 
   // Force close after 30 seconds
   setTimeout(() => {

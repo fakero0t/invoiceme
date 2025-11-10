@@ -6,16 +6,17 @@ export function createDashboardRoutes(container: DependencyContainer): Router {
   const router = Router();
 
   // GET /statistics - Get dashboard statistics
-  router.get('/statistics', async (req, res, next) => {
+  router.get('/statistics', async (req, res, next): Promise<void> => {
     try {
       if (!req.user) {
-        return res.status(401).json({
+        res.status(401).json({
           success: false,
           error: {
             code: 'AUTH_REQUIRED',
             message: 'Authentication required'
           }
         });
+        return;
       }
 
       const handler = container.resolve(GetDashboardStatisticsQueryHandler);

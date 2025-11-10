@@ -83,9 +83,17 @@ export class InvoiceApiService {
     return response.data.data;
   }
   
-  static async listInvoices(params?: ListInvoicesParams): Promise<InvoiceDTO[]> {
-    const response = await apiClient.get(this.BASE_URL, { params });
-    return response.data.data;
+  static async listInvoices(page: number = 1, pageSize: number = 25, status?: string, search?: string): Promise<{
+    items: InvoiceDTO[];
+    totalCount: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+  }> {
+    const response = await apiClient.get(this.BASE_URL, {
+      params: { page, pageSize, status, search }
+    });
+    return response.data;
   }
   
   static async downloadPDF(id: string): Promise<string> {

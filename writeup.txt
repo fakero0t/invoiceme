@@ -1,0 +1,58 @@
+InvoiceMe Architecture Patterns
+
+DDD Boundaries
+The project splits business logic into four bounded contexts, each living in src/domain/:
+
+- Customer Context: Full aggregate with value objects (EmailAddress, PhoneNumber, Address) that enforce business rules at the domain level
+- Invoice Context: Manages Invoice aggregate root with child LineItem entities
+  - Enforces invariants like "can't modify line items after invoice is sent"
+  - Validates "invoice totals must match sum of line items"
+- Payment Context: Tracks payments against invoices
+- User Context: Handles authentication (delegated to AWS Cognito) (uses basic auth in dev mode)
+
+Each context publishes domain events (CustomerCreated, InvoiceSent, PaymentRecorded) through an event bus, keeping contexts loosely coupled while allowing them to react to changes across the system.
+
+CQRS
+Clean separation between writes and reads:
+
+Commands (src/application/commands/):
+- Handle state changes (e.g., CreateInvoiceCommand, RecordPaymentCommand)
+- Enforce business rules through domain entities
+- Publish domain events
+- Return minimal data (usually just IDs)
+
+Queries (src/application/queries/):
+- Pure reads with no side effects (e.g., ListInvoicesQuery, GetCustomerQuery)
+- Bypass domain layer for performance
+- Fetch optimized DTOs directly from database
+- Enable separate optimization strategies (indexes, caching) without affecting write integrity
+
+Both share the same PostgreSQL database currently, but the architecture makes adding read replicas or caching layers trivial.
+
+Vertical Slice Architecture
+Code organized by feature, not technical layer:
+
+- Each feature lives in src/features/ (e.g., customers/, invoices/, payments/)
+- Feature slices contain all related operations:
+  - createCustomer.ts, updateCustomer.ts, deleteCustomer.ts
+  - getCustomer.ts, listCustomers.ts
+  - customerRouter.ts for API endpoints
+- Each file handles one use case end-to-end (HTTP → command/query handler)
+- Makes code easy to find—all customer logic in one place
+- Reduces coupling since each slice owns its vertical workflow
+
+How It All Comes Together
+The three patterns complement each other:
+
+- DDD: Domain layer with proper business logic encapsulation
+- CQRS: Application layer with clear write/read separation
+- VSA: Presentation layer organized by feature
+
+Request flow example (creating an invoice):
+1. Feature slice: features/invoices/
+2. Command handler: application/commands/invoices/CreateInvoice/
+3. Domain aggregate: domain/invoice/Invoice.ts (enforces rules)
+4. Repository: infrastructure/database/repositories/ (persists)
+5. Event bus: Publishes InvoiceCreatedEvent
+
+Result: Predictable, testable, easy to extend. Add features as vertical slices, operations as commands/queries, and business rules in domain entities.

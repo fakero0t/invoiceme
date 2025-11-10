@@ -1,4 +1,5 @@
 import apiClient from './client';
+import { hashPassword } from '../utils/crypto';
 
 export interface RegisterData {
   email: string;
@@ -27,17 +28,32 @@ export interface AuthResponse {
 
 /**
  * Register a new user account
+ * Password is hashed client-side before transmission
  */
 export const registerUser = async (data: RegisterData): Promise<AuthResponse> => {
-  const response = await apiClient.post('/api/v1/auth/register', data);
+  // Hash password client-side before sending
+  const hashedPassword = await hashPassword(data.password);
+  
+  const response = await apiClient.post('/api/v1/auth/register', {
+    ...data,
+    passwordHash: hashedPassword,
+    password: undefined, // Remove plain text password
+  });
   return response.data;
 };
 
 /**
  * Login with email and password
+ * Password is hashed client-side before transmission
  */
 export const loginUser = async (data: LoginData): Promise<AuthResponse> => {
-  const response = await apiClient.post('/api/v1/auth/login', data);
+  // Hash password client-side before sending
+  const hashedPassword = await hashPassword(data.password);
+  
+  const response = await apiClient.post('/api/v1/auth/login', {
+    email: data.email,
+    passwordHash: hashedPassword,
+  });
   return response.data;
 };
 

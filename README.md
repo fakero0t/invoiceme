@@ -1,16 +1,23 @@
-# Invoice MVP
+# InvoiceMe
 
-A comprehensive invoice management system built with Node.js, TypeScript, Vue 3, and PostgreSQL.
+Invoice management system for creating, tracking, and managing invoices with customer management, line items, payments, and PDF generation.
 
-## Architecture
+**Technical Writeup**: See [writeup.txt](./writeup.txt) for architecture details.
 
-This project follows **Domain-Driven Design (DDD)**, **CQRS**, and **Vertical Slice Architecture** principles:
+## Stack
 
 - **Backend**: Node.js + TypeScript + Express
 - **Frontend**: Vue 3 + TypeScript + Vite
 - **Database**: PostgreSQL 14+
-- **Cloud Services**: AWS Cognito (Auth), AWS S3 (Storage)
-- **PDF Generation**: Invoice-Generator.com API
+- **Auth**: AWS Cognito (basic auth in dev)
+- **Storage**: AWS S3
+- **PDF**: Invoice-Generator.com API
+
+## Architecture
+
+- **DDD**: Bounded contexts (Customer, Invoice, Payment, User)
+- **CQRS**: Separate command/query handlers
+- **VSA**: Feature-based organization
 
 ### Folder Structure
 
@@ -262,111 +269,12 @@ Expected response:
 }
 ```
 
-## Architecture Overview
+## Additional Documentation
 
-### Domain-Driven Design (DDD)
-
-The application follows DDD principles with clear bounded contexts:
-
-**Bounded Contexts:**
-- **Customer Context**: Customer management and relationships
-- **Invoice Context**: Invoice creation, line items, and lifecycle
-- **Payment Context**: Payment tracking and reconciliation
-- **User Context**: Authentication and user management
-
-**Domain Layer Components:**
-- **Entities**: Customer, Invoice, LineItem, Payment
-- **Value Objects**: Money, Email, Address, PhoneNumber, InvoiceNumber
-- **Aggregates**: Customer (root), Invoice (root with LineItems)
-- **Domain Events**: CustomerCreated, InvoiceCreated, InvoiceSent, PaymentRecorded
-
-### CQRS (Command Query Responsibility Segregation)
-
-Clear separation between write and read operations:
-
-**Commands (13 total):**
-- **Customer**: CreateCustomer, UpdateCustomer, DeleteCustomer
-- **Invoice**: CreateInvoice, AddLineItem, UpdateLineItem, RemoveLineItem, UpdateInvoice, MarkInvoiceAsSent, MarkInvoiceAsPaid, DeleteInvoice, GenerateInvoicePDF
-- **Payment**: RecordPayment
-
-**Queries (7 total):**
-- **Customer**: GetCustomer, ListCustomers
-- **Invoice**: GetInvoice, ListInvoices, GetInvoiceWithPayments
-- **Payment**: GetPayment, ListPayments
-
-### Architecture Layers
-
-```
-┌─────────────────────────────────────────┐
-│   Presentation Layer (API Routes)       │
-│   - Express routes                       │
-│   - Request/response handling           │
-└──────────────┬──────────────────────────┘
-               │
-┌──────────────▼──────────────────────────┐
-│   Application Layer (Use Cases)         │
-│   - Command Handlers                     │
-│   - Query Handlers                       │
-│   - DTOs and Mappers                     │
-└──────────────┬──────────────────────────┘
-               │
-┌──────────────▼──────────────────────────┐
-│   Domain Layer (Business Logic)         │
-│   - Entities & Aggregates                │
-│   - Value Objects                        │
-│   - Domain Events                        │
-│   - Business Rules                       │
-└──────────────┬──────────────────────────┘
-               │
-┌──────────────▼──────────────────────────┐
-│   Infrastructure Layer                   │
-│   - PostgreSQL repositories              │
-│   - AWS Cognito (auth)                   │
-│   - AWS S3 (storage)                     │
-│   - External APIs                        │
-└─────────────────────────────────────────┘
-```
-
-### Vertical Slice Architecture
-
-Features organized by business capability:
-
-```
-features/
-├── auth/          # Authentication & authorization
-├── customers/     # Customer management
-├── invoices/      # Invoice operations
-└── payments/      # Payment tracking
-```
-
-Each feature contains:
-- Routes (presentation)
-- Command/Query handlers (application)
-- Domain logic (if feature-specific)
-- Tests
-
-### Key Design Patterns
-
-1. **Repository Pattern**: Abstract data access
-2. **Command Pattern**: Encapsulate operations
-3. **Factory Pattern**: Entity creation
-4. **Event Bus Pattern**: Domain event handling
-5. **DTO Pattern**: Data transfer objects
-6. **Mapper Pattern**: Entity-DTO conversion
-
-For detailed architecture documentation, see [ARCHITECTURE.md](./ARCHITECTURE.md).
-
-## Contributing
-
-1. Follow the established folder structure
-2. Write tests for new features
-3. Run linting and formatting before committing
-4. Follow TypeScript strict mode guidelines
-5. Document complex business logic
-
-## Environment Variables Reference
-
-See `.env.example` for all required environment variables with descriptions.
+- [writeup.txt](./writeup.txt) - Architecture overview
+- [ARCHITECTURE.md](./ARCHITECTURE.md) - Detailed architecture documentation
+- [DEPLOYMENT.md](./DEPLOYMENT.md) - Deployment guide
+- [OPERATIONS.md](./OPERATIONS.md) - Operations guide
 
 ## Troubleshooting
 
@@ -399,11 +307,3 @@ rm -rf dist/
 # Rebuild
 npm run build
 ```
-
-## License
-
-ISC
-
-## Support
-
-For issues and questions, please open a GitHub issue.

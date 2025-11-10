@@ -4,18 +4,19 @@ const envSchema = z.object({
   // Database
   DATABASE_URL: z.string().url(),
 
-  // AWS General
+  // AWS General (keep for S3)
   AWS_REGION: z.string().min(1),
   AWS_ACCESS_KEY_ID: z.string().min(1),
   AWS_SECRET_ACCESS_KEY: z.string().min(1),
 
-  // AWS Cognito
-  AWS_COGNITO_USER_POOL_ID: z.string().regex(/^[a-z]+-[a-z]+-\d+_[a-zA-Z0-9]+$/),
-  AWS_COGNITO_CLIENT_ID: z.string().min(1),
-  AWS_COGNITO_CLIENT_SECRET: z.string().min(1).optional(),
-
   // AWS S3
   AWS_S3_BUCKET_NAME: z.string().min(1),
+
+  // JWT Authentication (NEW)
+  JWT_SECRET: z.string().min(32),
+  JWT_REFRESH_SECRET: z.string().min(32),
+  JWT_ACCESS_EXPIRATION: z.string().regex(/^\d+$/).default('3600'),
+  JWT_REFRESH_EXPIRATION: z.string().regex(/^\d+$/).default('2592000'),
 
   // Invoice Generator
   INVOICE_GENERATOR_API_KEY: z.string().min(1),

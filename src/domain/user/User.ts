@@ -3,13 +3,18 @@
  * Represents a user in the invoice system
  */
 export class User {
+  private passwordHash?: string;
+
   private constructor(
     public readonly id: string,
     public email: string,
     public name: string,
     public readonly createdAt: Date,
-    public updatedAt: Date
-  ) {}
+    public updatedAt: Date,
+    passwordHash?: string
+  ) {
+    this.passwordHash = passwordHash;
+  }
 
   /**
    * Factory method to create a new User with validation
@@ -20,6 +25,7 @@ export class User {
     name: string;
     createdAt?: Date;
     updatedAt?: Date;
+    passwordHash?: string;
   }): User {
     // Validate email format
     if (!props.email || !User.isValidEmail(props.email)) {
@@ -46,8 +52,28 @@ export class User {
       props.email,
       props.name.trim(),
       props.createdAt || now,
-      props.updatedAt || now
+      props.updatedAt || now,
+      props.passwordHash
     );
+  }
+
+  /**
+   * Factory method to create a new User with password
+   */
+  static createWithPassword(props: {
+    id: string;
+    email: string;
+    name: string;
+    passwordHash: string;
+  }): User {
+    if (!props.passwordHash) {
+      throw new Error('PASSWORD_HASH_REQUIRED');
+    }
+
+    return User.create({
+      ...props,
+      passwordHash: props.passwordHash,
+    });
   }
 
   /**
@@ -79,7 +105,26 @@ export class User {
   }
 
   /**
+   * Set password hash
+   */
+  setPasswordHash(hash: string): void {
+    if (!hash) {
+      throw new Error('PASSWORD_HASH_REQUIRED');
+    }
+    this.passwordHash = hash;
+    this.updatedAt = new Date();
+  }
+
+  /**
+   * Get password hash (for authentication)
+   */
+  getPasswordHash(): string | undefined {
+    return this.passwordHash;
+  }
+
+  /**
    * Convert to plain object for serialization
+   * Note: passwordHash is NOT included in JSON output for security
    */
   toJSON() {
     return {

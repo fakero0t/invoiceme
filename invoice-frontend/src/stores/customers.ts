@@ -23,7 +23,7 @@ export const useCustomerStore = defineStore('customers', () => {
   const totalPages = ref(0);
 
   // Getters
-  const hasCustomers = computed(() => customers.value.length > 0);
+  const hasCustomers = computed(() => customers.value && customers.value.length > 0);
 
   /**
    * Fetch customers with pagination and search
@@ -34,14 +34,17 @@ export const useCustomerStore = defineStore('customers', () => {
 
     try {
       const result: PagedResult<Customer> = await apiListCustomers(page, pageSize.value, search);
-      customers.value = result.items;
-      totalCount.value = result.totalCount;
-      currentPage.value = result.page;
-      pageSize.value = result.pageSize;
-      totalPages.value = result.totalPages;
+      customers.value = result.items || [];
+      totalCount.value = result.totalCount || 0;
+      currentPage.value = result.page || page;
+      pageSize.value = result.pageSize || pageSize.value;
+      totalPages.value = result.totalPages || 0;
       return result;
     } catch (err: any) {
-      error.value = err.response?.data?.message || 'Failed to fetch customers';
+      console.error('Failed to fetch customers:', err);
+      error.value = err.response?.data?.message || err.message || 'Failed to fetch customers';
+      customers.value = []; // Clear customers on error
+      totalCount.value = 0;
       throw err;
     } finally {
       isLoading.value = false;

@@ -57,7 +57,22 @@
           <svg class="error-icon" viewBox="0 0 20 20" fill="currentColor">
             <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
           </svg>
-          <span>{{ customerStore.error }}</span>
+          <div class="error-text">
+            <span class="error-message">{{ customerStore.error }}</span>
+            <div class="error-actions">
+              <VButton variant="primary" size="sm" @click="retryFetch">
+                Retry
+              </VButton>
+              <VButton 
+                v-if="customerStore.error.includes('Authentication') || customerStore.error.includes('required')" 
+                variant="secondary" 
+                size="sm" 
+                @click="goToLogin"
+              >
+                Go to Login
+              </VButton>
+            </div>
+          </div>
         </div>
       </VCard>
 
@@ -258,7 +273,12 @@ const tableColumns = [
 ];
 
 onMounted(async () => {
-  await customerStore.fetchCustomers();
+  try {
+    await customerStore.fetchCustomers();
+  } catch (error) {
+    // Error is already handled in the store
+    console.error('Error loading customers on mount:', error);
+  }
 });
 
 function formatCurrency(amount: number): string {
@@ -312,6 +332,18 @@ const goToView = (id: string) => {
 
 const goToEdit = (id: string) => {
   router.push(`/customers/${id}/edit`);
+};
+
+const goToLogin = () => {
+  router.push('/login');
+};
+
+const retryFetch = async () => {
+  try {
+    await customerStore.fetchCustomers(currentPage.value, searchQuery.value || undefined);
+  } catch (error) {
+    console.error('Error retrying fetch:', error);
+  }
 };
 
 const confirmDelete = (customer: Customer) => {
@@ -433,7 +465,7 @@ const performDelete = async () => {
 
 .error-content {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--spacing-3);
   color: var(--color-error-dark);
 }
@@ -442,6 +474,24 @@ const performDelete = async () => {
   width: var(--icon-lg);
   height: var(--icon-lg);
   flex-shrink: 0;
+}
+
+.error-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+  flex: 1;
+}
+
+.error-message {
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
+}
+
+.error-actions {
+  display: flex;
+  gap: var(--spacing-2);
+  flex-wrap: wrap;
 }
 
 /* Mobile Cards */

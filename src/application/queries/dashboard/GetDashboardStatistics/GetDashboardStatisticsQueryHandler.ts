@@ -4,7 +4,7 @@ import { GetDashboardStatisticsQuery } from './GetDashboardStatisticsQuery';
 import { IInvoiceRepository } from '../../../../domain/invoice/IInvoiceRepository';
 import { IPaymentRepository } from '../../../../domain/payment/IPaymentRepository';
 import { DashboardStatisticsDTO, RecentActivityItem } from '../../../dtos/DashboardStatisticsDTO';
-import { Money } from '../../../../domain/shared/Money';
+// Money import removed - not needed
 
 @injectable()
 export class GetDashboardStatisticsQueryHandler {

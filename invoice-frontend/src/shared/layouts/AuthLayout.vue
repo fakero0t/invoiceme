@@ -50,8 +50,8 @@ import { useSlots } from 'vue';
   bottom: 0;
   background: linear-gradient(
     135deg,
-    rgba(61, 149, 206, 0.1) 0%,
-    rgba(140, 122, 230, 0.1) 100%
+    rgba(107, 114, 128, 0.1) 0%,
+    rgba(115, 115, 115, 0.1) 100%
   );
   z-index: 0;
 }

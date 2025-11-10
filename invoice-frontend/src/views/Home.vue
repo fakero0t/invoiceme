@@ -1,16 +1,12 @@
 <template>
   <div class="home">
     <div class="hero">
-      <h1>Invoice MVP</h1>
+      <h1>invoiceme</h1>
       <p class="tagline">Professional Invoice Management Made Simple</p>
 
       <div class="cta-buttons">
-        <router-link to="/dashboard" class="btn btn-primary">Go to Dashboard (Dev Mode)</router-link>
+        <router-link to="/dashboard" class="btn btn-primary">Go to Dashboard</router-link>
         <router-link to="/customers" class="btn btn-secondary">View Customers</router-link>
-      </div>
-
-      <div class="dev-notice">
-        <p>🔓 Development Mode - Authentication Disabled</p>
       </div>
     </div>
   </div>
@@ -26,7 +22,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #4B5563 0%, #374151 100%);
   padding: 2rem;
 }
 
@@ -66,7 +62,7 @@ h1 {
 
 .btn-primary {
   background: white;
-  color: #667eea;
+  color: #1F2937;
 }
 
 .btn-primary:hover {
@@ -95,19 +91,6 @@ h1 {
 .authenticated-message p {
   margin-bottom: 1rem;
   font-size: 1.2rem;
-}
-
-.dev-notice {
-  margin-top: 3rem;
-  padding: 1.5rem;
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 0.5rem;
-  backdrop-filter: blur(10px);
-  border: 2px solid rgba(255, 255, 255, 0.3);
-}
-
-.dev-notice p {
-  margin: 0.5rem 0;
 }
 </style>
 

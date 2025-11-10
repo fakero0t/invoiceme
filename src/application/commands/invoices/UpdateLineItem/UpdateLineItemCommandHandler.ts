@@ -1,5 +1,5 @@
 import { inject, injectable } from 'tsyringe';
-import { Pool, PoolClient } from 'pg';
+import { Pool } from 'pg';
 import { UpdateLineItemCommand } from './UpdateLineItemCommand';
 import { IInvoiceRepository } from '../../../../domain/invoice/IInvoiceRepository';
 import { IEventBus } from '../../../../domain/shared/IEventBus';

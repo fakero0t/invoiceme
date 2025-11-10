@@ -25,10 +25,8 @@ export function createCustomerRoutes(container: DependencyContainer): Router {
       });
       console.log('Customer created, id:', customerId);
       
-      res.status(201).json({
-        success: true,
-        data: { id: customerId }
-      });
+      // Return customer id directly
+      res.status(201).json({ id: customerId });
     } catch (error) {
       console.error('POST /customers - Error caught:', error);
       console.error('Error message:', error instanceof Error ? error.message : String(error));
@@ -50,10 +48,8 @@ export function createCustomerRoutes(container: DependencyContainer): Router {
         phoneNumber: req.body.phoneNumber,
       });
       
-      res.json({
-        success: true,
-        data: { id: req.params.id }
-      });
+      // Return customer id directly
+      res.json({ id: req.params.id });
     } catch (error) {
       next(error);
     }
@@ -68,10 +64,8 @@ export function createCustomerRoutes(container: DependencyContainer): Router {
         userId: req.user!.id,
       });
       
-      res.json({
-        success: true,
-        data: { id: req.params.id }
-      });
+      // Return customer id directly
+      res.json({ id: req.params.id });
     } catch (error) {
       next(error);
     }
@@ -86,10 +80,8 @@ export function createCustomerRoutes(container: DependencyContainer): Router {
         userId: req.user!.id,
       });
       
-      res.json({
-        success: true,
-        data: customer
-      });
+      // Return customer directly (not wrapped) to match frontend expectations
+      res.json(customer);
     } catch (error) {
       next(error);
     }
@@ -101,14 +93,29 @@ export function createCustomerRoutes(container: DependencyContainer): Router {
       console.log('GET /customers - Request received, userId:', req.user?.id);
       const handler = container.resolve(ListCustomersQueryHandler);
       console.log('Handler resolved successfully');
+      
+      // Parse pagination parameters
+      const page = parseInt(req.query.page as string) || 1;
+      const pageSize = parseInt(req.query.pageSize as string) || 25;
+      
       const customers = await handler.handle({
         userId: req.user!.id,
       });
       console.log('Customers fetched, count:', customers.length);
       
+      // Return paginated format expected by frontend
+      const totalCount = customers.length;
+      const totalPages = Math.ceil(totalCount / pageSize);
+      const startIndex = (page - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+      const paginatedItems = customers.slice(startIndex, endIndex);
+      
       res.json({
-        success: true,
-        data: customers
+        items: paginatedItems,
+        totalCount: totalCount,
+        page: page,
+        pageSize: pageSize,
+        totalPages: totalPages
       });
     } catch (error) {
       console.error('GET /customers - Error caught:', error);

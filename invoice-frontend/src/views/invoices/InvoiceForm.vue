@@ -25,17 +25,53 @@
             <label for="customer" class="form-label">
             Customer <span class="required">*</span>
           </label>
-            <VSelect
-              id="customer"
-            v-model="form.customerId"
-              :options="customerOptions"
-            :disabled="isEditMode || isLoadingCustomers"
-              :error="!!errors.customerId"
-              :helper-text="errors.customerId"
-            />
-            <p v-if="customers.length === 0 && !isLoadingCustomers" class="helper-text error-helper">
-              No customers found. <router-link to="/customers/new" class="helper-link">Create one first</router-link>.
-          </p>
+            
+            <!-- Empty State: No Customers -->
+            <div v-if="customers.length === 0 && !isLoadingCustomers" class="empty-customer-state">
+              <div class="empty-customer-content">
+                <svg class="empty-icon" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
+                </svg>
+                <div class="empty-text">
+                  <p class="empty-title">No customers yet</p>
+                  <p class="empty-description">Create your first customer to start invoicing</p>
+                </div>
+              </div>
+              <VButton 
+                variant="primary" 
+                size="md" 
+                @click="goToCreateCustomer"
+              >
+                <svg class="btn-icon" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+                </svg>
+                Create Customer
+              </VButton>
+            </div>
+
+            <!-- Normal Customer Select -->
+            <div v-else class="customer-select-wrapper">
+              <VSelect
+                id="customer"
+              v-model="form.customerId"
+                :options="customerOptions"
+              :disabled="isEditMode || isLoadingCustomers"
+                :error="!!errors.customerId"
+                :helper-text="errors.customerId"
+              />
+              <VButton 
+                v-if="!isEditMode"
+                variant="ghost" 
+                size="sm" 
+                @click="goToCreateCustomer"
+                class="quick-add-btn"
+              >
+                <svg class="btn-icon" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+                </svg>
+                Add New
+              </VButton>
+            </div>
         </div>
 
         <!-- Company Info -->
@@ -232,7 +268,7 @@
           <VTable
             v-else
             :columns="lineItemColumns"
-            :rows="lineItemRows"
+            :data="displayLineItems"
           >
             <template #cell-description="{ row }">
               <span class="description-cell">{{ row.description }}</span>
@@ -401,7 +437,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue';
+import { ref, reactive, onMounted, computed, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useInvoiceStore } from '../../stores/invoices';
 import { usePaymentStore } from '../../stores/payments';
@@ -458,9 +494,21 @@ const breadcrumbs = computed(() => [
 ]);
 
 const customerOptions = computed(() => {
+  console.log('Computing customerOptions:', {
+    isLoading: isLoadingCustomers.value,
+    customersCount: customers.value.length,
+    storeLoading: customerStore.isLoading,
+    storeCustomersCount: customerStore.customers.length
+  });
+  
   if (isLoadingCustomers.value) {
     return [{ value: '', label: 'Loading customers...' }];
   }
+  
+  if (customers.value.length === 0) {
+    return [{ value: '', label: 'No customers available' }];
+  }
+  
   return [
     { value: '', label: 'Select a customer' },
     ...customers.value.map(c => ({ value: c.id, label: `${c.name} (${c.email})` }))
@@ -493,8 +541,6 @@ const lineItemColumns = [
   { key: 'amount', label: 'Amount' },
   { key: 'actions', label: '' },
 ];
-
-const lineItemRows = computed(() => displayLineItems.value);
 
 const displayLineItems = computed(() => {
   if (isEditMode.value && invoiceStore.currentInvoice) {
@@ -533,17 +579,58 @@ const paymentTimelineItems = computed(() => {
   }));
 });
 
+// Debug watch to see when customer data changes
+watch([customers, isLoadingCustomers], ([newCustomers, newLoading]) => {
+  console.log('Customers changed:', {
+    count: newCustomers.length,
+    isLoading: newLoading,
+    customers: newCustomers
+  });
+}, { immediate: true });
+
+// Debug watch for line items
+watch([localLineItems, displayLineItems], ([local, display]) => {
+  console.log('Line items changed:', {
+    localCount: local.length,
+    displayCount: display.length,
+    localItems: local,
+    displayItems: display
+  });
+}, { immediate: true, deep: true });
+
 onMounted(async () => {
   // Fetch customers list
+  console.log('InvoiceForm onMounted - starting customer fetch');
   isLoadingCustomers.value = true;
+  
+  // Use setTimeout to ensure the loading state is set before async operation
+  await new Promise(resolve => setTimeout(resolve, 0));
+  
   try {
+    console.log('Fetching customers for invoice form...');
     const result = await customerStore.fetchCustomers();
-    customers.value = result.items;
-  } catch (error) {
-    console.error('Failed to load customers:', error);
+    console.log('Customers fetched successfully:', result);
+    
+    if (result && result.items) {
+      customers.value = result.items;
+      console.log('Customers assigned:', customers.value.length, 'customers');
+    } else {
+      console.error('Invalid result structure:', result);
+      customers.value = [];
+    }
+  } catch (error: any) {
+    console.error('Failed to load customers:', {
+      error,
+      message: error?.message,
+      response: error?.response?.data
+    });
     customers.value = [];
   } finally {
     isLoadingCustomers.value = false;
+    console.log('isLoadingCustomers set to false. Final state:', {
+      isLoading: isLoadingCustomers.value,
+      customersCount: customers.value.length
+    });
   }
 
   // Load invoice if editing
@@ -624,17 +711,30 @@ const handleAddLineItem = async () => {
 
   if (isEditMode.value && invoiceStore.currentInvoice) {
     try {
-      await invoiceStore.addLineItem(invoiceStore.currentInvoice.id, { ...newLineItem });
+      await invoiceStore.addLineItem(invoiceStore.currentInvoice.id, {
+        description: newLineItem.description,
+        quantity: newLineItem.quantity,
+        unitPrice: newLineItem.unitPrice,
+      });
       cancelAddLineItem();
       toast.success('Line item added successfully!');
     } catch (error) {
       toast.error('Failed to add line item');
     }
   } else {
-    localLineItems.value.push({
-      ...newLineItem,
+    // Create a proper copy of values (not reactive references)
+    const itemToAdd = {
+      description: newLineItem.description,
+      quantity: newLineItem.quantity,
+      unitPrice: newLineItem.unitPrice,
       tempId: nextTempId++,
-    });
+    };
+    
+    console.log('Adding line item:', itemToAdd);
+    localLineItems.value.push(itemToAdd);
+    console.log('Local line items after add:', localLineItems.value);
+    console.log('Display line items length:', displayLineItems.value.length);
+    
     cancelAddLineItem();
   }
 };
@@ -691,6 +791,10 @@ const handlePaymentSuccess = async () => {
 
 const goBack = () => {
   router.push('/invoices');
+};
+
+const goToCreateCustomer = () => {
+  router.push('/customers/new');
 };
 
 const formatDate = (dateString: string): string => {
@@ -805,6 +909,72 @@ const formatPaymentMethod = (method: string): string => {
 
 .helper-link:hover {
   opacity: 0.8;
+}
+
+/* Empty Customer State */
+.empty-customer-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-4);
+  padding: var(--spacing-8) var(--spacing-4);
+  background: linear-gradient(135deg, var(--color-background-secondary) 0%, var(--color-background-primary) 100%);
+  border: 2px dashed var(--color-border-gray);
+  border-radius: var(--radius-lg);
+  text-align: center;
+}
+
+.empty-customer-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-3);
+}
+
+.empty-icon {
+  width: 48px;
+  height: 48px;
+  color: var(--color-venmo-blue);
+  opacity: 0.5;
+}
+
+.empty-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+}
+
+.empty-title {
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.empty-description {
+  font-size: var(--font-size-body-sm);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+/* Customer Select with Quick Add */
+.customer-select-wrapper {
+  display: flex;
+  gap: var(--spacing-2);
+  align-items: flex-start;
+}
+
+.customer-select-wrapper :deep(.v-select) {
+  flex: 1;
+}
+
+.quick-add-btn {
+  flex-shrink: 0;
+  margin-top: 0;
+}
+
+.quick-add-btn .btn-icon {
+  margin-right: var(--spacing-1);
 }
 
 .btn-icon {
@@ -1045,6 +1215,14 @@ const formatPaymentMethod = (method: string): string => {
 
   .form-row-grid {
     grid-template-columns: 1fr;
+  }
+
+  .customer-select-wrapper {
+    flex-direction: column;
+  }
+
+  .quick-add-btn {
+    width: 100%;
   }
 
   .line-item-grid {
