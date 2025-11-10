@@ -2,7 +2,7 @@
 
 Invoice management system for creating, tracking, and managing invoices with customer management, line items, payments, and PDF generation.
 
-**Technical Writeup**: See [writeup.txt](./writeup.txt) for architecture details.
+**Documentation**: See [writeup.txt](./writeup.txt) for architecture overview and [ai_development.md](./ai_development.md) for AI-accelerated development process. Additional docs listed [below](#additional-documentation).
 
 ## Stack
 
@@ -272,6 +272,7 @@ Expected response:
 ## Additional Documentation
 
 - [writeup.txt](./writeup.txt) - Architecture overview
+- [ai_development.md](./ai_development.md) - AI-accelerated development process
 - [ARCHITECTURE.md](./ARCHITECTURE.md) - Detailed architecture documentation
 - [DEPLOYMENT.md](./DEPLOYMENT.md) - Deployment guide
 - [OPERATIONS.md](./OPERATIONS.md) - Operations guide
