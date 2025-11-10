@@ -258,7 +258,7 @@ function createInvoice() {
 
 function navigateToActivity(activity: any) {
   if (activity.type === 'invoice') {
-    router.push(`/invoices/${activity.id}`);
+    router.push(`/invoices/${activity.id}/edit`);
   } else if (activity.type === 'payment') {
     router.push(`/payments/${activity.id}`);
   }

@@ -2,6 +2,7 @@ import { inject, injectable } from 'tsyringe';
 import { Pool, PoolClient } from 'pg';
 import { IInvoiceRepository } from '../../domain/invoice/IInvoiceRepository';
 import { Invoice } from '../../domain/invoice/Invoice';
+import { InvoiceNumber } from '../../domain/invoice/InvoiceNumber';
 import { LineItem } from '../../domain/invoice/LineItem';
 
 @injectable()
@@ -16,55 +17,121 @@ export class PostgreSQLInvoiceRepository implements IInvoiceRepository {
       if (isOwnTransaction) await client.query('BEGIN');
       
       // 1. Save invoice
-      const invoiceQuery = `
-        INSERT INTO invoices (
-          id, invoice_number, user_id, customer_id, company_info, status, 
-          subtotal, tax_rate, tax_amount, total, notes, terms, 
-          issue_date, due_date, sent_date, paid_date, pdf_s3_keys, 
-          deleted_at, created_at, updated_at
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
-        ON CONFLICT (id) DO UPDATE SET
-          invoice_number = EXCLUDED.invoice_number,
-          company_info = EXCLUDED.company_info,
-          status = EXCLUDED.status,
-          subtotal = EXCLUDED.subtotal,
-          tax_rate = EXCLUDED.tax_rate,
-          tax_amount = EXCLUDED.tax_amount,
-          total = EXCLUDED.total,
-          notes = EXCLUDED.notes,
-          terms = EXCLUDED.terms,
-          issue_date = EXCLUDED.issue_date,
-          due_date = EXCLUDED.due_date,
-          sent_date = EXCLUDED.sent_date,
-          paid_date = EXCLUDED.paid_date,
-          pdf_s3_keys = EXCLUDED.pdf_s3_keys,
-          deleted_at = EXCLUDED.deleted_at,
-          updated_at = EXCLUDED.updated_at
-      `;
+      // If invoice_number is empty/pending, omit it from INSERT to use database DEFAULT
+      const hasInvoiceNumber = invoice.invoiceNumber.value !== '';
       
-      await client.query(invoiceQuery, [
-        invoice.id,
-        invoice.invoiceNumber.value,
-        invoice.userId,
-        invoice.customerId,
-        invoice.companyInfo,
-        invoice.status,
-        invoice.subtotal.value,
-        invoice.taxRate,
-        invoice.taxAmount.value,
-        invoice.total.value,
-        invoice.notes,
-        invoice.terms,
-        invoice.issueDate,
-        invoice.dueDate,
-        invoice.sentDate,
-        invoice.paidDate,
-        invoice.pdfS3Keys,
-        invoice.deletedAt,
-        invoice.createdAt,
-        invoice.updatedAt,
-      ]);
+      let invoiceQuery: string;
+      let queryParams: any[];
+      
+      if (hasInvoiceNumber) {
+        // Include invoice_number in the query
+        invoiceQuery = `
+          INSERT INTO invoices (
+            id, invoice_number, user_id, customer_id, company_info, status, 
+            subtotal, tax_rate, tax_amount, total, notes, terms, 
+            issue_date, due_date, sent_date, paid_date, pdf_s3_keys, 
+            deleted_at, created_at, updated_at
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+          ON CONFLICT (id) DO UPDATE SET
+            invoice_number = EXCLUDED.invoice_number,
+            company_info = EXCLUDED.company_info,
+            status = EXCLUDED.status,
+            subtotal = EXCLUDED.subtotal,
+            tax_rate = EXCLUDED.tax_rate,
+            tax_amount = EXCLUDED.tax_amount,
+            total = EXCLUDED.total,
+            notes = EXCLUDED.notes,
+            terms = EXCLUDED.terms,
+            issue_date = EXCLUDED.issue_date,
+            due_date = EXCLUDED.due_date,
+            sent_date = EXCLUDED.sent_date,
+            paid_date = EXCLUDED.paid_date,
+            pdf_s3_keys = EXCLUDED.pdf_s3_keys,
+            deleted_at = EXCLUDED.deleted_at,
+            updated_at = EXCLUDED.updated_at
+          RETURNING invoice_number
+        `;
+        queryParams = [
+          invoice.id,
+          invoice.invoiceNumber.value,
+          invoice.userId,
+          invoice.customerId,
+          invoice.companyInfo,
+          invoice.status,
+          invoice.subtotal.value,
+          invoice.taxRate,
+          invoice.taxAmount.value,
+          invoice.total.value,
+          invoice.notes,
+          invoice.terms,
+          invoice.issueDate,
+          invoice.dueDate,
+          invoice.sentDate,
+          invoice.paidDate,
+          invoice.pdfS3Keys,
+          invoice.deletedAt,
+          invoice.createdAt,
+          invoice.updatedAt,
+        ];
+      } else {
+        // Omit invoice_number to use database DEFAULT
+        invoiceQuery = `
+          INSERT INTO invoices (
+            id, user_id, customer_id, company_info, status, 
+            subtotal, tax_rate, tax_amount, total, notes, terms, 
+            issue_date, due_date, sent_date, paid_date, pdf_s3_keys, 
+            deleted_at, created_at, updated_at
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+          ON CONFLICT (id) DO UPDATE SET
+            company_info = EXCLUDED.company_info,
+            status = EXCLUDED.status,
+            subtotal = EXCLUDED.subtotal,
+            tax_rate = EXCLUDED.tax_rate,
+            tax_amount = EXCLUDED.tax_amount,
+            total = EXCLUDED.total,
+            notes = EXCLUDED.notes,
+            terms = EXCLUDED.terms,
+            issue_date = EXCLUDED.issue_date,
+            due_date = EXCLUDED.due_date,
+            sent_date = EXCLUDED.sent_date,
+            paid_date = EXCLUDED.paid_date,
+            pdf_s3_keys = EXCLUDED.pdf_s3_keys,
+            deleted_at = EXCLUDED.deleted_at,
+            updated_at = EXCLUDED.updated_at
+          RETURNING invoice_number
+        `;
+        queryParams = [
+          invoice.id,
+          invoice.userId,
+          invoice.customerId,
+          invoice.companyInfo,
+          invoice.status,
+          invoice.subtotal.value,
+          invoice.taxRate,
+          invoice.taxAmount.value,
+          invoice.total.value,
+          invoice.notes,
+          invoice.terms,
+          invoice.issueDate,
+          invoice.dueDate,
+          invoice.sentDate,
+          invoice.paidDate,
+          invoice.pdfS3Keys,
+          invoice.deletedAt,
+          invoice.createdAt,
+          invoice.updatedAt,
+        ];
+      }
+      
+      const result = await client.query(invoiceQuery, queryParams);
+      
+      // Update the invoice object with the generated invoice number if it was empty
+      if (!invoice.invoiceNumber.value && result.rows[0]?.invoice_number) {
+        // @ts-ignore - Updating private field with DB-generated value
+        invoice.invoiceNumber = new InvoiceNumber(result.rows[0].invoice_number);
+      }
       
       // 2. Delete existing line items
       await client.query(
@@ -203,28 +270,11 @@ export class PostgreSQLInvoiceRepository implements IInvoiceRepository {
   }
   
   async generateInvoiceNumber(userId: string): Promise<string> {
-    const query = `
-      SELECT invoice_number FROM invoices
-      WHERE user_id = $1
-      ORDER BY created_at DESC
-      LIMIT 1
-    `;
-    
-    const result = await this.db.query(query, [userId]);
-    
-    if (result.rows.length === 0) {
-      return 'INV-0001';
-    }
-    
-    const lastNumber = result.rows[0].invoice_number;
-    const match = lastNumber.match(/INV-(\d+)/);
-    
-    if (match) {
-      const nextNumber = parseInt(match[1]) + 1;
-      return `INV-${nextNumber.toString().padStart(4, '0')}`;
-    }
-    
-    return 'INV-0001';
+    // Use the database sequence to generate unique invoice numbers
+    // This prevents race conditions when creating invoices concurrently
+    const result = await this.db.query("SELECT nextval('invoice_number_seq') as sequence");
+    const sequence = result.rows[0].sequence;
+    return `INV-${sequence}`;
   }
   
   private mapRowToInvoice(row: any, lineItemRows: any[]): Invoice {

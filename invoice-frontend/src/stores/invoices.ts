@@ -194,13 +194,12 @@ export const useInvoiceStore = defineStore('invoices', () => {
     error.value = null;
 
     try {
-      const invoice = await apiMarkInvoiceAsSent(id);
+      await apiMarkInvoiceAsSent(id);
+      // Refresh the invoice to get updated status
+      const invoice = await fetchInvoice(id);
       const index = invoices.value.findIndex((inv) => inv.id === id);
       if (index !== -1) {
         invoices.value[index] = invoice;
-      }
-      if (currentInvoice.value?.id === id) {
-        currentInvoice.value = invoice;
       }
       return invoice;
     } catch (err: any) {

@@ -106,9 +106,8 @@ export const removeLineItem = async (invoiceId: string, lineItemId: string): Pro
   await apiClient.delete(`/api/v1/invoices/${invoiceId}/line-items/${lineItemId}`);
 };
 
-export const markInvoiceAsSent = async (id: string): Promise<Invoice> => {
-  const response = await apiClient.post(`/api/v1/invoices/${id}/mark-as-sent`);
-  return response.data.invoice;
+export const markInvoiceAsSent = async (id: string): Promise<void> => {
+  await apiClient.post(`/api/v1/invoices/${id}/mark-sent`);
 };
 
 export const downloadInvoicePDF = async (id: string): Promise<string> => {

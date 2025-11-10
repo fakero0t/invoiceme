@@ -19,8 +19,8 @@ export function createInvoiceRoutes(container: DependencyContainer): Router {
   router.post('/', async (req, res, next) => {
     try {
       console.log('POST /invoices - Request received:', req.body);
-      const handler = container.resolve(CreateInvoiceCommandHandler);
-      const invoiceId = await handler.handle({
+      const createHandler = container.resolve(CreateInvoiceCommandHandler);
+      const invoiceId = await createHandler.handle({
         userId: req.user!.id,
         customerId: req.body.customerId,
         companyInfo: req.body.companyInfo,
@@ -32,8 +32,14 @@ export function createInvoiceRoutes(container: DependencyContainer): Router {
       });
       console.log('Invoice created successfully, id:', invoiceId);
       
-      // Return invoice object directly to match frontend expectations
-      res.status(201).json({ id: invoiceId });
+      // Fetch and return the complete invoice
+      const getHandler = container.resolve(GetInvoiceQueryHandler);
+      const invoice = await getHandler.handle({
+        invoiceId: invoiceId,
+        userId: req.user!.id,
+      });
+      
+      res.status(201).json(invoice);
     } catch (error) {
       console.error('POST /invoices - Error:', error);
       next(error);

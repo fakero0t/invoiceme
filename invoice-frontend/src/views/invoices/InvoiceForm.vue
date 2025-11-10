@@ -15,6 +15,13 @@
         </VButton>
     </div>
 
+      <!-- Loading State -->
+      <div v-if="isLoading && isEditMode" class="loading-container">
+        <VSkeleton type="card" :count="3" />
+      </div>
+
+      <!-- Invoice Content -->
+      <div v-else>
       <!-- Invoice Details -->
       <VCard class="form-section-card">
       <h2 class="section-title">Invoice Details</h2>
@@ -433,6 +440,7 @@
       @close="showPaymentModal = false"
       @success="handlePaymentSuccess"
     />
+      </div>
   </MainLayout>
 </template>
 
@@ -454,6 +462,7 @@ import {
   VDivider,
   VEmptyState,
   VTimeline,
+  VSkeleton,
 } from '../../shared/components';
 import { useToast, useBreakpoint } from '../../shared/composables';
 import RecordPaymentModal from '../../components/RecordPaymentModal.vue';
@@ -639,6 +648,7 @@ onMounted(async () => {
     isEditMode.value = true;
     try {
       const invoice = await invoiceStore.fetchInvoice(id);
+      
       form.customerId = invoice.customerId;
       form.companyInfo = invoice.companyInfo;
       form.issueDate = invoice.issueDate.split('T')[0];
@@ -652,6 +662,7 @@ onMounted(async () => {
         await paymentStore.fetchPayments(id);
       }
     } catch (error) {
+      console.error('Failed to load invoice:', error);
       toast.error('Failed to load invoice');
       router.push('/invoices');
     }
@@ -823,6 +834,12 @@ const formatPaymentMethod = (method: string): string => {
   gap: var(--spacing-6);
   max-width: 1200px;
   margin: 0 auto;
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
 }
 
 .breadcrumbs {

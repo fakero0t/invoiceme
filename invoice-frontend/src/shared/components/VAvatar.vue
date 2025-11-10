@@ -11,6 +11,7 @@ import { computed } from 'vue';
 export interface VAvatarProps {
   src?: string;
   alt?: string;
+  name?: string;
   initials?: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
 }
@@ -18,6 +19,7 @@ export interface VAvatarProps {
 const props = withDefaults(defineProps<VAvatarProps>(), {
   src: '',
   alt: '',
+  name: '',
   initials: '',
   size: 'md',
 });
@@ -30,9 +32,23 @@ const avatarClasses = computed(() => {
 });
 
 const computedInitials = computed(() => {
+  // Use explicit initials if provided
   if (props.initials) {
     return props.initials.substring(0, 2).toUpperCase();
   }
+  
+  // Generate initials from name if provided
+  if (props.name) {
+    const nameParts = props.name.trim().split(/\s+/);
+    if (nameParts.length >= 2) {
+      // First letter of first name + first letter of last name
+      return (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase();
+    } else if (nameParts[0].length > 0) {
+      // Just first letter of single name
+      return nameParts[0][0].toUpperCase();
+    }
+  }
+  
   return '?';
 });
 

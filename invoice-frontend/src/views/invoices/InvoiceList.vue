@@ -125,7 +125,7 @@
       <VCard v-else-if="invoiceStore.hasInvoices && !isMobile" class="table-card">
         <VTable
           :columns="tableColumns"
-          :rows="tableRows"
+          :data="tableRows"
           :sortable="true"
           @sort="handleSort"
         >

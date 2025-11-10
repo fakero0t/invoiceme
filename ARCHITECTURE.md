@@ -21,7 +21,135 @@ The Invoice Management System follows **Domain-Driven Design (DDD)**, **CQRS**, 
 - **Scalability**: CQRS enables independent scaling of reads/writes
 - **Maintainability**: Vertical slices reduce coupling
 
+### System Architecture Overview
+
+```mermaid
+graph TB
+    subgraph "Client Layer"
+        FE[Vue.js Frontend<br/>Port: 5173]
+    end
+    
+    subgraph "API Layer"
+        API[Express API Server<br/>Port: 3000]
+        AUTH[Auth Middleware<br/>JWT Validation]
+        ROUTES[Route Handlers]
+    end
+    
+    subgraph "Application Layer - CQRS"
+        CMD[Command Handlers<br/>Write Operations]
+        QRY[Query Handlers<br/>Read Operations]
+    end
+    
+    subgraph "Domain Layer"
+        CUST[Customer Aggregate]
+        INV[Invoice Aggregate]
+        PAY[Payment Aggregate]
+        EVENTS[Domain Events]
+    end
+    
+    subgraph "Infrastructure Layer"
+        REPO[Repositories]
+        MAPPER[Mappers]
+        EVENTBUS[Event Bus]
+    end
+    
+    subgraph "External Services"
+        COGNITO[AWS Cognito<br/>Authentication]
+        S3[AWS S3<br/>PDF Storage]
+        PDFAPI[Invoice Generator API<br/>PDF Creation]
+    end
+    
+    subgraph "Data Store"
+        DB[(PostgreSQL<br/>Database)]
+    end
+    
+    FE -->|HTTP/REST| API
+    API --> AUTH
+    AUTH --> ROUTES
+    ROUTES -->|Write| CMD
+    ROUTES -->|Read| QRY
+    
+    CMD --> CUST
+    CMD --> INV
+    CMD --> PAY
+    
+    CUST --> EVENTS
+    INV --> EVENTS
+    PAY --> EVENTS
+    
+    CMD --> REPO
+    QRY --> REPO
+    REPO --> MAPPER
+    REPO --> DB
+    
+    EVENTS --> EVENTBUS
+    
+    AUTH -->|Validate Token| COGNITO
+    CMD -->|Upload PDF| S3
+    CMD -->|Generate PDF| PDFAPI
+    
+    style FE fill:#e1f5ff
+    style API fill:#fff4e1
+    style CMD fill:#ffe1f5
+    style QRY fill:#ffe1f5
+    style CUST fill:#e1ffe1
+    style INV fill:#e1ffe1
+    style PAY fill:#e1ffe1
+    style DB fill:#f0f0f0
+```
+
 ## Bounded Contexts
+
+```mermaid
+graph LR
+    subgraph "Customer Context"
+        C1[Customer Aggregate]
+        C2[CustomerName VO]
+        C3[EmailAddress VO]
+        C4[Address VO]
+        C5[PhoneNumber VO]
+        C1 --> C2
+        C1 --> C3
+        C1 --> C4
+        C1 --> C5
+    end
+    
+    subgraph "Invoice Context"
+        I1[Invoice Aggregate]
+        I2[LineItem Entity]
+        I3[InvoiceNumber VO]
+        I4[Money VO]
+        I5[InvoiceStatus VO]
+        I1 --> I2
+        I1 --> I3
+        I1 --> I4
+        I1 --> I5
+    end
+    
+    subgraph "Payment Context"
+        P1[Payment Entity]
+        P2[Money VO]
+        P3[PaymentMethod VO]
+        P1 --> P2
+        P1 --> P3
+    end
+    
+    subgraph "User Context"
+        U1[AWS Cognito]
+        U2[User Profile]
+        U1 --> U2
+    end
+    
+    I1 -.->|References| C1
+    P1 -.->|References| I1
+    C1 -.->|Owned by| U2
+    I1 -.->|Owned by| U2
+    
+    style C1 fill:#e1f5ff
+    style I1 fill:#ffe1f5
+    style P1 fill:#fff4e1
+    style U1 fill:#e1ffe1
+```
 
 ### 1. Customer Context
 **Purpose**: Manage customer information and relationships
@@ -552,25 +680,129 @@ interface IEventBus {
 ## Data Flow
 
 ### Command Flow (Write)
-```
-1. API Request → Route Handler
-2. Route Handler → Command Handler
-3. Command Handler → Domain Entity (validation)
-4. Domain Entity → Repository (persistence)
-5. Repository → Database
-6. Command Handler → Event Bus (domain event)
-7. Event Bus → Event Handlers (async)
-8. Route Handler → API Response
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Route as Route Handler
+    participant Auth as Auth Middleware
+    participant CMD as Command Handler
+    participant Domain as Domain Entity
+    participant Repo as Repository
+    participant DB as Database
+    participant EventBus as Event Bus
+    participant Handler as Event Handler
+    
+    Client->>+Route: POST/PUT/DELETE Request
+    Route->>+Auth: Validate JWT Token
+    Auth->>-Route: userId
+    
+    Route->>+CMD: Execute Command
+    CMD->>+Domain: Create/Update/Delete
+    Domain->>Domain: Validate Business Rules
+    Domain-->>CMD: Domain Entity
+    
+    CMD->>+Repo: Save/Update/Delete
+    Repo->>+DB: SQL Transaction
+    DB-->>-Repo: Success
+    Repo-->>-CMD: void
+    
+    CMD->>+EventBus: Publish Domain Event
+    EventBus-->>-CMD: void
+    CMD-->>-Route: Result (id/void)
+    
+    EventBus->>Handler: Async Event Processing
+    Handler->>Handler: Side Effects (logging, etc)
+    
+    Route-->>-Client: HTTP Response (201/200/204)
 ```
 
 ### Query Flow (Read)
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Route as Route Handler
+    participant Auth as Auth Middleware
+    participant QRY as Query Handler
+    participant Repo as Repository
+    participant DB as Database
+    participant Mapper as Mapper
+    
+    Client->>+Route: GET Request
+    Route->>+Auth: Validate JWT Token
+    Auth->>-Route: userId
+    
+    Route->>+QRY: Execute Query
+    QRY->>+Repo: Find/List
+    Repo->>+DB: SELECT Query
+    DB-->>-Repo: Raw Data
+    
+    Repo->>+Mapper: Map to DTO
+    Mapper-->>-Repo: DTO Object
+    Repo-->>-QRY: DTO/DTO[]
+    
+    QRY-->>-Route: Result
+    Route-->>-Client: HTTP Response (200 + JSON)
 ```
-1. API Request → Route Handler
-2. Route Handler → Query Handler
-3. Query Handler → Repository
-4. Repository → Database
-5. Repository → Mapper (Entity → DTO)
-6. Route Handler → API Response
+
+### Layer Architecture
+
+```mermaid
+graph TB
+    subgraph "Presentation Layer"
+        P1[Express Routes]
+        P2[Middleware]
+        P3[Request Validation]
+        P4[Response Formatting]
+    end
+    
+    subgraph "Application Layer"
+        A1[Command Handlers]
+        A2[Query Handlers]
+        A3[DTOs]
+        A4[Mappers]
+    end
+    
+    subgraph "Domain Layer"
+        D1[Aggregates]
+        D2[Entities]
+        D3[Value Objects]
+        D4[Domain Events]
+        D5[Business Rules]
+    end
+    
+    subgraph "Infrastructure Layer"
+        I1[Repositories]
+        I2[Database]
+        I3[Event Bus]
+        I4[External APIs]
+        I5[AWS Services]
+    end
+    
+    P1 --> P2
+    P2 --> P3
+    P3 --> A1
+    P3 --> A2
+    A1 --> D1
+    A2 --> I1
+    D1 --> D2
+    D1 --> D3
+    D1 --> D4
+    D2 --> D5
+    A1 --> I1
+    A4 --> A3
+    I1 --> I2
+    D4 --> I3
+    A1 --> I4
+    A1 --> I5
+    P1 --> P4
+    
+    style P1 fill:#e1f5ff
+    style A1 fill:#ffe1f5
+    style A2 fill:#ffe1f5
+    style D1 fill:#e1ffe1
+    style I1 fill:#fff4e1
 ```
 
 ## Event System

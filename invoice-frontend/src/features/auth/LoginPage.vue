@@ -35,12 +35,7 @@
         </div>
 
         <div class="form-field">
-          <div class="form-label-row">
-            <label for="password" class="form-label">Password</label>
-            <router-link to="/forgot-password" class="forgot-link">
-              Forgot password?
-            </router-link>
-          </div>
+          <label for="password" class="form-label">Password</label>
           <div class="input-with-icon">
             <svg class="input-icon" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" />
@@ -217,24 +212,6 @@ const handleLogin = async () => {
   font-size: var(--font-size-body-sm);
   font-weight: var(--font-weight-medium);
   color: var(--color-text-primary);
-}
-
-.form-label-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.forgot-link {
-  font-size: var(--font-size-body-sm);
-  color: var(--color-venmo-blue);
-  text-decoration: none;
-  transition: color var(--duration-base) var(--ease-out);
-}
-
-.forgot-link:hover {
-  color: var(--color-venmo-blue-600);
-  text-decoration: underline;
 }
 
 .input-with-icon {

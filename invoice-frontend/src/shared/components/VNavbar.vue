@@ -23,13 +23,21 @@
             </svg>
           </button>
           
-          <!-- Profile avatar -->
-          <VAvatar 
-            :src="userAvatar" 
-            :name="userName"
-            size="sm"
-            class="v-navbar-avatar"
-          />
+          <!-- User dropdown menu -->
+          <VDropdown :items="userMenuItems" placement="bottom">
+            <template #trigger>
+              <button type="button" class="v-navbar-user-trigger" aria-label="User menu">
+                <VAvatar 
+                  :src="userAvatar" 
+                  :name="userName"
+                  size="sm"
+                />
+                <svg class="v-navbar-chevron" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                </svg>
+              </button>
+            </template>
+          </VDropdown>
         </slot>
       </div>
     </div>
@@ -37,16 +45,57 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
+import { useRouter } from 'vue-router';
+import { useAuthStore } from '../../stores/auth';
 import VAvatar from './VAvatar.vue';
+import VDropdown from './VDropdown.vue';
 
 export interface VNavbarProps {
   userAvatar?: string;
   userName?: string;
 }
 
-withDefaults(defineProps<VNavbarProps>(), {
+const props = withDefaults(defineProps<VNavbarProps>(), {
   userName: 'User',
 });
+
+const router = useRouter();
+const authStore = useAuthStore();
+
+const userMenuItems = computed(() => [
+  {
+    label: props.userName || 'User',
+    disabled: true,
+  },
+  {
+    divider: true,
+  },
+  {
+    label: 'Profile',
+    onClick: () => {
+      // Navigate to profile page when implemented
+      console.log('Profile clicked');
+    },
+  },
+  {
+    label: 'Settings',
+    onClick: () => {
+      // Navigate to settings page when implemented
+      console.log('Settings clicked');
+    },
+  },
+  {
+    divider: true,
+  },
+  {
+    label: 'Logout',
+    onClick: async () => {
+      await authStore.logout();
+      router.push('/login');
+    },
+  },
+]);
 </script>
 
 <style scoped>
@@ -139,6 +188,33 @@ withDefaults(defineProps<VNavbarProps>(), {
 
 .v-navbar-avatar {
   cursor: pointer;
+}
+
+.v-navbar-user-trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-1) var(--spacing-2);
+  border: none;
+  background: none;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: background-color var(--duration-base) var(--ease-out);
+}
+
+.v-navbar-user-trigger:hover {
+  background-color: var(--color-venmo-blue-50);
+}
+
+.v-navbar-chevron {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  color: var(--color-text-secondary);
+  transition: transform var(--duration-base) var(--ease-out);
+}
+
+.v-navbar-user-trigger:hover .v-navbar-chevron {
+  color: var(--color-venmo-blue);
 }
 </style>
 

@@ -1,6 +1,6 @@
 <template>
   <div class="main-layout">
-    <VNavbar :user-avatar="userAvatar" :user-name="userName">
+    <VNavbar :user-avatar="userAvatar" :user-name="displayUserName">
       <template #actions>
         <slot name="navbar-actions" />
       </template>
@@ -33,6 +33,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { useAuthStore } from '../../stores/auth';
 import VNavbar from '../components/VNavbar.vue';
 import VSidebar from '../components/VSidebar.vue';
 import VBottomNav from '../components/VBottomNav.vue';
@@ -49,10 +50,14 @@ export interface MainLayoutProps {
 const props = withDefaults(defineProps<MainLayoutProps>(), {
   sidebarItems: () => [],
   bottomNavItems: () => [],
-  userName: 'User',
 });
 
+const authStore = useAuthStore();
 const sidebarCollapsed = ref(false);
+
+const displayUserName = computed(() => {
+  return props.userName || authStore.user?.name || authStore.user?.email || 'User';
+});
 
 const mainContentClasses = computed(() => {
   return [
